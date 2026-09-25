@@ -20,16 +20,16 @@ export function formatMarkdownReport(report) {
   lines.push('');
 
   if (report.diagnostics && report.diagnostics.length > 0) {
-    lines.push('### Intent vs Reality Diagnosed');
+    lines.push('### Configuration & Bundle Diagnostics');
     for (const d of report.diagnostics) {
       lines.push(`> [!WARNING] **${d.title}**: ${d.message}`);
     }
     lines.push('');
   }
 
-  lines.push('### Quick-Wins & Optimization Opportunities');
+  lines.push('### Actionable Remediations (Polyfills & Configuration)');
   if (report.quickWins.length === 0) {
-    lines.push('No low-hanging fruit issues found. Your bundle is already broadly compatible!');
+    lines.push('No immediate remediation required. Your bundle is already broadly compatible!');
   } else {
     lines.push('| Effort Level | Feature | Category | Est. Time | Recommended Action |');
     lines.push('|---|---|---|---|---|');
@@ -40,7 +40,7 @@ export function formatMarkdownReport(report) {
   lines.push('');
 
   if (report.structuralBlockers.length > 0) {
-    lines.push('### Structural Architectural Blockers (Effort 3 & 4)');
+    lines.push('### Architectural Constraints (Effort 3 & 4)');
     for (const item of report.structuralBlockers) {
       lines.push(`- **${item.name}** (\`${item.featureKey}\`): ${item.remediation}`);
     }

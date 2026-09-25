@@ -22,7 +22,7 @@ Most compatibility tools run during linting on source files. While useful, stati
    - JavaScript: Uses Acorn to scan for ECMAScript syntax versions, global Web APIs, and prototype method usage.
    - CSS: Uses CSSTree to scan for selectors (`:has()`, `:is()`), at-rules (`@container`, `@layer`), and modern color functions (`color-mix`, `oklch`).
    - HTML: Uses htmlparser2 to scan for modern elements and attributes.
-3. **Intent versus Reality Check**: Compares detected bundler settings (like `target: 'es2015'` in Vite or PostCSS configuration) against features found in the generated bundles.
+3. **Configuration vs Bundle Verification**: Compares detected bundler settings (such as target in Vite or PostCSS configuration) against features actually emitted in the compiled bundles.
 4. **Effort Tiers**: Groups issues by remediation difficulty to distinguish trivial polyfills from deeper architectural constraints.
 
 ## Effort Tiers
@@ -69,7 +69,41 @@ compat-audit [directory] [options]
 
 ## Example Output
 
-### Terminal Report (`default`)
+### Monorepo & Multi-Target Analysis Case
+
+In real projects and monorepos, compatibility issues rarely stem from application code alone. They often leak from internal design systems or shared packages (`packages/ui`) that distribute untranspiled syntax or modern CSS directly into production:
+
+```
+================================================================================
+                    COMPAT-AUDIT BUNDLE ANALYSIS REPORT                         
+================================================================================
+
+Target: apps/web (Application SPA) + packages/ui (Design System)
+Scanned Assets: 48 files (32 JS, 13 CSS, 3 HTML)
+Estimated Global Coverage: 95.2% of web audience
+
+EFFECTIVE BROWSER FLOOR:
+   Chrome 120+  |  Safari 17.2+  |  Firefox 121+  |  Edge 120+  |  iOS Safari 17.2+
+
+ROOT CAUSE ANALYSIS:
+
+1. Untranspiled Syntax Leaks (from packages/ui):
+   ! packages/ui distributes modern JS with optional chaining (?.) and nullish
+     coalescing (??) directly into dist/.
+   -> Impact: Hard floor at Chrome 80+, Safari 13.1+, Firefox 74+.
+   -> Action: Ensure packages/ui build pipeline targets ES2018 or downlevels syntax.
+
+2. Native CSS Nesting without Fallback:
+   ! Relaxed CSS nesting (&) detected in compiled component styles.
+   -> Impact: Imposes Safari 17.2+ / Chrome 120+ for type selector nesting.
+   -> Action: Add postcss-nested or @csstools/postcss-nesting in postcss.config.js.
+
+3. Runtime Web APIs & Modern Selectors:
+   ! structuredClone() used in state serialization (blocks Safari < 15.4).
+   ! :has() selector used in card layouts (blocks Firefox < 121).
+```
+
+### CLI Terminal Output (`default`)
 
 ```
 ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -83,11 +117,11 @@ Estimated Coverage: 95.1% global audience
 EFFECTIVE BROWSER FLOOR (Minimum required versions):
    Chrome 105+  |  Safari 15.4+  |  Firefox 105+  |  Edge 105+  |  iOS Safari 15.4+  |  Chrome Android 105+
 
-INTENT VS REALITY DIAGNOSTIC:
+CONFIGURATION & BUNDLE DIAGNOSTICS:
    ! Syntax vs Runtime Gap: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
    ! CSS Nesting without fallback: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
 
-TOP QUICK-WINS & LOW-HANGING FRUITS (Sorted by ROI):
+RECOMMENDED REMEDIATIONS (Polyfills & Configuration):
    ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────┐
    │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                                     │
    ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────┤
@@ -97,9 +131,9 @@ TOP QUICK-WINS & LOW-HANGING FRUITS (Sorted by ROI):
    │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in postcss.config.js             │
    │   E2  │ OKLCH Colors                  │ css         │ ~15 mins    │ Add @csstools/postcss-oklab-function in PostCSS        │
    └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────┘
-   Legend: E1 = Trivial runtime micro-polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)
+   Legend: E1 = Lightweight runtime polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)
 
-STRUCTURAL LIMITS (Effort 3 & 4 - Requires Architectural Choice):
+ARCHITECTURAL CONSTRAINTS (Effort 3 & 4 - Requires Architectural Choice):
    • ResizeObserver (api.ResizeObserver) : Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
    • :has() selector (css.selectors.has) : Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
 
@@ -126,20 +160,20 @@ Run with --format json or --format markdown for CI/CD or PR integrations.
 | **iOS Safari** | `15.4+` |
 | **Chrome Android** | `105+` |
 
-### Intent vs Reality Diagnosed
+### Configuration & Bundle Diagnostics
 > [!WARNING] **Syntax vs Runtime Gap**: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
 > [!WARNING] **CSS Nesting without fallback**: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
 
-### Quick-Wins & Optimization Opportunities
+### Actionable Remediations (Polyfills & Configuration)
 | Effort Level | Feature | Category | Est. Time | Recommended Action |
 |---|---|---|---|---|
-| **E1** (Trivial Quick Win) | `structuredClone()` | api | ~5 mins | Import @ungap/structured-clone (1.2KB) in entry |
-| **E1** (Trivial Quick Win) | `Array.prototype.at()` | prototype | ~5 mins | Add tiny Array.prototype.at polyfill in entry |
-| **E1** (Trivial Quick Win) | `Object.hasOwn()` | builtin | ~5 mins | Add tiny Object.hasOwn polyfill in entry |
-| **E2** (Low Effort) | `Native CSS Nesting (&)` | selector | ~15 mins | Enable postcss-nested in postcss.config.js |
-| **E2** (Low Effort) | `OKLCH Colors` | css | ~15 mins | Add @csstools/postcss-oklab-function in PostCSS |
+| **E1** (Trivial Polyfill) | `structuredClone()` | api | ~5 mins | Import @ungap/structured-clone (1.2KB) in entry |
+| **E1** (Trivial Polyfill) | `Array.prototype.at()` | prototype | ~5 mins | Add tiny Array.prototype.at polyfill in entry |
+| **E1** (Trivial Polyfill) | `Object.hasOwn()` | builtin | ~5 mins | Add tiny Object.hasOwn polyfill in entry |
+| **E2** (Configuration) | `Native CSS Nesting (&)` | selector | ~15 mins | Enable postcss-nested in postcss.config.js |
+| **E2** (Configuration) | `OKLCH Colors` | css | ~15 mins | Add @csstools/postcss-oklab-function in PostCSS |
 
-### Structural Architectural Blockers (Effort 3 & 4)
+### Architectural Constraints (Effort 3 & 4)
 - **ResizeObserver** (`api.ResizeObserver`): Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
 - **:has() selector** (`css.selectors.has`): Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
 ```

@@ -28,17 +28,17 @@ export function formatTerminalReport(report) {
 
   // Intent vs Reality
   if (report.diagnostics && report.diagnostics.length > 0) {
-    lines.push(pc.bold(pc.yellow('INTENT VS REALITY DIAGNOSTIC:')));
+    lines.push(pc.bold(pc.yellow('CONFIGURATION & BUNDLE DIAGNOSTICS:')));
     for (const diag of report.diagnostics) {
       lines.push(`   ${pc.yellow('!')} ${pc.bold(diag.title)}: ${diag.message}`);
     }
     lines.push('');
   }
 
-  // Quick Wins Table
-  lines.push(pc.bold(pc.underline('TOP QUICK-WINS & LOW-HANGING FRUITS (Sorted by ROI):')));
+  // Recommended Remediations
+  lines.push(pc.bold(pc.underline('RECOMMENDED REMEDIATIONS (Polyfills & Configuration):')));
   if (report.quickWins.length === 0) {
-    lines.push(`   ${pc.green('No low-hanging fruit issues found. Your bundle is already widely compatible!')}`);
+    lines.push(`   ${pc.green('No immediate remediation required. Your bundle is already widely compatible!')}`);
   } else {
     lines.push(`   ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────┐`);
     lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Est. Time')}   │ ${pc.bold('Recommended Action')}                                     │`);
@@ -53,13 +53,13 @@ export function formatTerminalReport(report) {
       lines.push(`   │  ${levelBadge} │ ${feat} │ ${cat} │ ${time} │ ${action} │`);
     }
     lines.push(`   └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────┘`);
-    lines.push(`   ${pc.dim('Legend: E1 = Trivial runtime micro-polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)')}`);
+    lines.push(`   ${pc.dim('Legend: E1 = Lightweight runtime polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)')}`);
   }
   lines.push('');
 
-  // High effort / Structural blockers
+  // Architectural Constraints
   if (report.structuralBlockers.length > 0) {
-    lines.push(pc.bold(pc.magenta('STRUCTURAL LIMITS (Effort 3 & 4 - Requires Architectural Choice):')));
+    lines.push(pc.bold(pc.magenta('ARCHITECTURAL CONSTRAINTS (Effort 3 & 4 - Requires Architectural Choice):')));
     for (const item of report.structuralBlockers) {
       lines.push(`   • ${pc.bold(item.name)} (${item.featureKey}) : ${pc.dim(item.remediation)}`);
     }
