@@ -242,7 +242,8 @@ function bridgeSkills(sourceBaseDir, targetBaseDir, filesCreated, isRelative = f
           ? path.relative(targetBaseDir, sourceDir)
           : sourceDir;
 
-        fs.symlinkSync(linkTarget, targetDir, 'dir');
+        const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
+        fs.symlinkSync(linkTarget, targetDir, symlinkType);
         filesCreated.push(path.join(targetDir, 'SKILL.md'));
       } catch {
         // Fallback to copy if symlinks not supported
@@ -260,7 +261,7 @@ function bridgeSkills(sourceBaseDir, targetBaseDir, filesCreated, isRelative = f
 
 /**
  * Scaffolds AI agent skills into local workspace or global agent directories
- * supporting all major AI agent harnesses (Claude Code, Codex, Antigravity, Cursor, Zed, OpenCode)
+ * supporting all major AI agent harnesses (Claude Code, Codex, Antigravity, Cursor, Zed, OpenCode, Copilot, Windsurf)
  */
 export function initSkills(options = {}) {
   const isGlobal = Boolean(options.global);
@@ -287,7 +288,7 @@ export function initSkills(options = {}) {
   } else {
     const projectRoot = options.cwd || process.cwd();
 
-    // 1. Universal Agent Standard: .agents/skills/ (Antigravity, Codex, Cursor, Zed, OpenCode)
+    // 1. Universal Agent Standard: .agents/skills/ (Antigravity, Codex, Zed, OpenCode)
     const agentsDir = path.join(projectRoot, '.agents', 'skills');
     writeSkillsTo(agentsDir, filesCreated);
     harnessesSupported.push('Universal Agent Standard (.agents/skills/)');
@@ -296,6 +297,43 @@ export function initSkills(options = {}) {
     const claudeDir = path.join(projectRoot, '.claude', 'skills');
     bridgeSkills(agentsDir, claudeDir, filesCreated, true);
     harnessesSupported.push('Claude Code (.claude/skills/)');
+
+    // 3. Cursor rules bridge: .cursor/rules/compat.mdc
+    try {
+      const cursorDir = path.join(projectRoot, '.cursor', 'rules');
+      fs.mkdirSync(cursorDir, { recursive: true });
+      const cursorFile = path.join(cursorDir, 'compat.mdc');
+      fs.writeFileSync(cursorFile, `---
+description: Browser compatibility auditing and zero-bloat optimization
+globs: *
+---
+
+# Browser Compatibility Rules
+
+- Audit bundle floor: Run \`npx compat-audit --build --json\` to detect real browser floors and compatibility gaps.
+- Optimize compatibility: Run \`/compat-optimize\` or inspect \`.agents/skills/compat-optimize/SKILL.md\` for zero-dependency inline polyfills.
+`, 'utf-8');
+      filesCreated.push(cursorFile);
+      harnessesSupported.push('Cursor (.cursor/rules/compat.mdc)');
+    } catch {}
+
+    // 4. GitHub Copilot bridge: .github/copilot-instructions.md
+    try {
+      const githubDir = path.join(projectRoot, '.github');
+      fs.mkdirSync(githubDir, { recursive: true });
+      const copilotFile = path.join(githubDir, 'copilot-instructions.md');
+      const instructionText = `\n## Browser Compatibility Guidelines\n- Run \`npx compat-audit --build --json\` to audit production bundle compatibility.\n- For missing Web APIs (structuredClone, Array.at, Object.hasOwn), use zero-dependency inline polyfills in \`src/polyfills.ts\` without installing external packages.\n`;
+      if (fs.existsSync(copilotFile)) {
+        const existing = fs.readFileSync(copilotFile, 'utf-8');
+        if (!existing.includes('compat-audit')) {
+          fs.appendFileSync(copilotFile, instructionText);
+        }
+      } else {
+        fs.writeFileSync(copilotFile, instructionText.trim() + '\n', 'utf-8');
+      }
+      filesCreated.push(copilotFile);
+      harnessesSupported.push('GitHub Copilot (.github/copilot-instructions.md)');
+    } catch {}
   }
 
   return {

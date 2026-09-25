@@ -91,6 +91,8 @@ export class CssScanner {
               const func = funcNode.name.toLowerCase();
               if (func === 'color-mix') {
                 addFinding('css.types.color.color-mix', 'color-mix() function', 'color');
+              } else if (func === 'light-dark') {
+                addFinding('css.types.color.light-dark', 'light-dark() color function', 'color');
               } else if (func === 'oklch') {
                 addFinding('css.types.color.oklch', 'oklch() color function', 'color');
               } else if (func === 'oklab') {

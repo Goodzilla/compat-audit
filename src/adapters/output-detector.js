@@ -82,7 +82,7 @@ export function findAssetFiles(dir) {
         walk(full);
       } else if (entry.isFile()) {
         const ext = path.extname(entry.name).toLowerCase();
-        if (['.js', '.mjs', '.css', '.html'].includes(ext)) {
+        if (['.js', '.mjs', '.cjs', '.css', '.html'].includes(ext)) {
           assets.push(full);
         }
       }

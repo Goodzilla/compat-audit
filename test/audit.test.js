@@ -113,11 +113,45 @@ describe('Source attribution & directory exclusion tests', () => {
 
     const vendorFindings = scanner.scan(appCode, 'dist/chunks/vendor-lucide.js');
     assert.equal(vendorFindings[0].origin, 'vendor');
+
+    // Windows backslash path resilience
+    const windowsVendorFindings = scanner.scan(appCode, 'dist\\chunks\\vendor-lucide.js');
+    assert.equal(windowsVendorFindings[0].origin, 'vendor', 'Windows backslash path must be recognized as vendor');
   });
 
   it('safeguards against repository pollution by ignoring dangerous directories', () => {
     assert.ok(IGNORED_DIRS.has('.pnpm-store'));
     assert.ok(IGNORED_DIRS.has('node_modules'));
     assert.ok(IGNORED_DIRS.has('.git'));
+  });
+});
+
+import { CssScanner } from '../src/scanners/css.js';
+
+describe('Baseline 2024 web features tests', () => {
+  const db = new CompatDatabase();
+  const jsScanner = new JsScanner(db);
+  const cssScanner = new CssScanner(db);
+
+  it('detects Promise.withResolvers and Object.groupBy', () => {
+    const code = `
+      const { promise, resolve } = Promise.withResolvers();
+      const grouped = Object.groupBy([1, 2, 3], x => x % 2);
+      const setDiff = setA.union(setB);
+    `;
+    const findings = jsScanner.scan(code, 'app.js');
+    const keys = findings.map(f => f.featureKey);
+
+    assert.ok(keys.includes('javascript.builtins.Promise.withResolvers'), 'Should detect Promise.withResolvers');
+    assert.ok(keys.includes('javascript.builtins.Object.groupBy'), 'Should detect Object.groupBy');
+    assert.ok(keys.includes('javascript.builtins.Set.union'), 'Should detect Set.prototype.union');
+  });
+
+  it('detects CSS light-dark() color function', () => {
+    const css = `.theme { color: light-dark(#333, #fff); }`;
+    const findings = cssScanner.scan(css, 'style.css');
+    const keys = findings.map(f => f.featureKey);
+
+    assert.ok(keys.includes('css.types.color.light-dark'), 'Should detect light-dark()');
   });
 });

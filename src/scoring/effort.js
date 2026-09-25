@@ -81,6 +81,42 @@ export const REMEDIATION_CATALOG = {
     pkg: 'queue-microtask',
     costKb: 0.3
   },
+  'javascript.builtins.Promise.withResolvers': {
+    effort: 1,
+    fix: 'Add tiny inline Promise.withResolvers polyfill in entry',
+    pkg: null,
+    costKb: 0.1
+  },
+  'javascript.builtins.Object.groupBy': {
+    effort: 1,
+    fix: 'Add tiny inline Object.groupBy polyfill in entry',
+    pkg: null,
+    costKb: 0.15
+  },
+  'javascript.builtins.Map.groupBy': {
+    effort: 1,
+    fix: 'Add tiny inline Map.groupBy polyfill in entry',
+    pkg: null,
+    costKb: 0.15
+  },
+  'javascript.builtins.Array.fromAsync': {
+    effort: 1,
+    fix: 'Add inline Array.fromAsync polyfill in entry',
+    pkg: null,
+    costKb: 0.3
+  },
+  'javascript.builtins.Set.union': {
+    effort: 1,
+    fix: 'Add inline Set.prototype.union polyfill in entry',
+    pkg: null,
+    costKb: 0.1
+  },
+  'javascript.builtins.Set.intersection': {
+    effort: 1,
+    fix: 'Add inline Set.prototype.intersection polyfill in entry',
+    pkg: null,
+    costKb: 0.1
+  },
 
   // --- Effort 2 : Bundler Config & CSS Transforms (~15 mins) ---
   'javascript.operators.optional_chaining': {
@@ -123,6 +159,12 @@ export const REMEDIATION_CATALOG = {
     effort: 2,
     fix: 'Add @csstools/postcss-oklab-function in PostCSS',
     pkg: '@csstools/postcss-oklab-function',
+    costKb: 0
+  },
+  'css.types.color.light-dark': {
+    effort: 2,
+    fix: 'Use @media (prefers-color-scheme) or CSS variables fallback for light-dark()',
+    pkg: 'postcss-preset-env',
     costKb: 0
   },
 
