@@ -1,6 +1,6 @@
 {
   "name": "compat-audit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Zero-config production bundle browser compatibility auditor & quick-win optimizer",
   "keywords": [
     "browser-compatibility",
