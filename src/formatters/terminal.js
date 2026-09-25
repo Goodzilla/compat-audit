@@ -41,7 +41,7 @@ export function formatTerminalReport(report) {
     lines.push(`   ${pc.green('No low-hanging fruit issues found. Your bundle is already widely compatible!')}`);
   } else {
     lines.push(`   ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────┐`);
-    lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Est. Time')}   │ ${pc.bold('Recommended Action')}                                       │`);
+    lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Est. Time')}   │ ${pc.bold('Recommended Action')}                                     │`);
     lines.push(`   ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────┤`);
 
     for (const item of report.quickWins.slice(0, 8)) {

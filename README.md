@@ -69,31 +69,82 @@ compat-audit [directory] [options]
 
 ## Example Output
 
+### Terminal Report (`default`)
+
 ```
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                       COMPAT-AUDIT BUNDLE REPORT                          ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 Scanned Directory: dist/
-Assets Scanned:    32 files (24 JS, 8 CSS)
-Estimated Coverage: 96.4% global audience
+Assets Scanned:    38 files (24 JS, 11 CSS, 3 HTML)
+Estimated Coverage: 95.1% global audience
 
 EFFECTIVE BROWSER FLOOR (Minimum required versions):
-   Chrome 98+  |  Safari 15.4+  |  Firefox 94+  |  Edge 98+  |  iOS Safari 15.4+
+   Chrome 105+  |  Safari 15.4+  |  Firefox 105+  |  Edge 105+  |  iOS Safari 15.4+  |  Chrome Android 105+
 
 INTENT VS REALITY DIAGNOSTIC:
-   ! Syntax vs Runtime Gap: Your bundler targets 'es2018', but the bundle contains runtime Web APIs (structuredClone, crypto.randomUUID). Bundlers transpile JavaScript syntax but do not polyfill global runtime APIs without dedicated polyfills.
+   ! Syntax vs Runtime Gap: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
+   ! CSS Nesting without fallback: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
 
 TOP QUICK-WINS & LOW-HANGING FRUITS (Sorted by ROI):
-   ┌───────┬───────────────────────────────┬─────────────┬─────────────┬──────────────────────────────────────────┐
-   │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                       │
-   ├───────┼───────────────────────────────┼─────────────┼─────────────┼──────────────────────────────────────────┤
-   │   E1  │ structuredClone()             │ api         │ ~5 mins     │ Import @ungap/structured-clone (1.2KB)   │
-   │   E1  │ Array/String.prototype.at()   │ prototype   │ ~5 mins     │ Add tiny Array.prototype.at polyfill     │
-   │   E1  │ Object.hasOwn()               │ builtin     │ ~5 mins     │ Add tiny Object.hasOwn polyfill in entry │
-   │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in configuration   │
-   └───────┴───────────────────────────────┴─────────────┴─────────────┴──────────────────────────────────────────┘
+   ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────┐
+   │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                                     │
+   ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────┤
+   │   E1  │ structuredClone()             │ api         │ ~5 mins     │ Import @ungap/structured-clone (1.2KB) in entry        │
+   │   E1  │ Array.prototype.at()          │ prototype   │ ~5 mins     │ Add tiny Array.prototype.at polyfill in entry          │
+   │   E1  │ Object.hasOwn()               │ builtin     │ ~5 mins     │ Add tiny Object.hasOwn polyfill in entry               │
+   │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in postcss.config.js             │
+   │   E2  │ OKLCH Colors                  │ css         │ ~15 mins    │ Add @csstools/postcss-oklab-function in PostCSS        │
+   └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────┘
+   Legend: E1 = Trivial runtime micro-polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)
+
+STRUCTURAL LIMITS (Effort 3 & 4 - Requires Architectural Choice):
+   • ResizeObserver (api.ResizeObserver) : Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
+   • :has() selector (css.selectors.has) : Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
+
+Run with --format json or --format markdown for CI/CD or PR integrations.
 ```
+
+<details>
+<summary><b>View CI / PR Markdown Report Format (<code>--markdown</code>)</b></summary>
+
+```markdown
+## Browser Compatibility Audit Report
+
+- **Scanned Directory:** `dist/`
+- **Total Files Scanned:** 38 (24 JS, 11 CSS, 3 HTML)
+- **Estimated Global Coverage:** **95.1%**
+
+### Effective Browser Floor
+| Browser | Minimum Version Required |
+|---|---|
+| **Chrome** | `105+` |
+| **Safari** | `15.4+` |
+| **Firefox** | `105+` |
+| **Edge** | `105+` |
+| **iOS Safari** | `15.4+` |
+| **Chrome Android** | `105+` |
+
+### Intent vs Reality Diagnosed
+> [!WARNING] **Syntax vs Runtime Gap**: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
+> [!WARNING] **CSS Nesting without fallback**: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
+
+### Quick-Wins & Optimization Opportunities
+| Effort Level | Feature | Category | Est. Time | Recommended Action |
+|---|---|---|---|---|
+| **E1** (Trivial Quick Win) | `structuredClone()` | api | ~5 mins | Import @ungap/structured-clone (1.2KB) in entry |
+| **E1** (Trivial Quick Win) | `Array.prototype.at()` | prototype | ~5 mins | Add tiny Array.prototype.at polyfill in entry |
+| **E1** (Trivial Quick Win) | `Object.hasOwn()` | builtin | ~5 mins | Add tiny Object.hasOwn polyfill in entry |
+| **E2** (Low Effort) | `Native CSS Nesting (&)` | selector | ~15 mins | Enable postcss-nested in postcss.config.js |
+| **E2** (Low Effort) | `OKLCH Colors` | css | ~15 mins | Add @csstools/postcss-oklab-function in PostCSS |
+
+### Structural Architectural Blockers (Effort 3 & 4)
+- **ResizeObserver** (`api.ResizeObserver`): Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
+- **:has() selector** (`css.selectors.has`): Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
+```
+
+</details>
 
 ## Programmatic API
 

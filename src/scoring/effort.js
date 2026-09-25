@@ -35,49 +35,49 @@ export const REMEDIATION_CATALOG = {
   // --- Effort 1 : Trivial Runtime Polyfills (< 1KB) ---
   'javascript.builtins.Array.at': {
     effort: 1,
-    fix: 'Add tiny polyfill in entry file: if (!Array.prototype.at) Array.prototype.at = function(n) { n = Math.trunc(n) || 0; if (n < 0) n += this.length; if (n < 0 || n >= this.length) return undefined; return this[n]; };',
+    fix: 'Add tiny Array.prototype.at polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Object.hasOwn': {
     effort: 1,
-    fix: 'Add tiny polyfill: Object.hasOwn = Object.hasOwn || ((obj, prop) => Object.prototype.hasOwnProperty.call(obj, prop));',
+    fix: 'Add tiny Object.hasOwn polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Promise.allSettled': {
     effort: 1,
-    fix: 'Add inline Promise.allSettled polyfill or core-js/actual/promise/all-settled.',
+    fix: 'Add inline Promise.allSettled polyfill in entry',
     pkg: 'promise.allsettled',
     costKb: 0.4
   },
   'javascript.builtins.Promise.any': {
     effort: 1,
-    fix: 'Add Promise.any ponyfill or core-js/actual/promise/any.',
+    fix: 'Add Promise.any polyfill or core-js ponyfill',
     pkg: 'promise.any',
     costKb: 0.5
   },
   'javascript.builtins.String.replaceAll': {
     effort: 1,
-    fix: 'Add String.prototype.replaceAll polyfill.',
+    fix: 'Add String.prototype.replaceAll polyfill in entry',
     pkg: 'string.prototype.replaceall',
     costKb: 0.3
   },
   'api.structuredClone': {
     effort: 1,
-    fix: 'Import @ungap/structured-clone (1.2KB) or core-js/actual/structured-clone in entry.',
+    fix: 'Import @ungap/structured-clone (1.2KB) in entry',
     pkg: '@ungap/structured-clone',
     costKb: 1.2
   },
   'api.Crypto.randomUUID': {
     effort: 1,
-    fix: 'Use crypto.getRandomValues fallback or uuid/v4 for older browsers.',
+    fix: 'Use crypto.getRandomValues fallback or uuid v4',
     pkg: null,
     costKb: 0.2
   },
   'api.queueMicrotask': {
     effort: 1,
-    fix: 'Add queue-microtask or Promise.resolve().then(fn) polyfill.',
+    fix: 'Add queue-microtask or Promise.resolve polyfill',
     pkg: 'queue-microtask',
     costKb: 0.3
   },
@@ -85,43 +85,43 @@ export const REMEDIATION_CATALOG = {
   // --- Effort 2 : Bundler Config & CSS Transforms (~15 mins) ---
   'javascript.operators.optional_chaining': {
     effort: 2,
-    fix: 'Adjust bundler target (e.g. Vite target: "es2019") or enable @babel/plugin-transform-optional-chaining.',
+    fix: 'Adjust bundler target (e.g. Vite target: "es2019")',
     pkg: null,
     costKb: 0
   },
   'javascript.operators.nullish_coalescing': {
     effort: 2,
-    fix: 'Adjust bundler target (e.g. target: "es2019") or enable @babel/plugin-transform-nullish-coalescing-operator.',
+    fix: 'Adjust bundler target (e.g. Vite target: "es2019")',
     pkg: null,
     costKb: 0
   },
   'javascript.operators.logical_assignment': {
     effort: 2,
-    fix: 'Adjust bundler target to ES2020 or enable @babel/plugin-transform-logical-assignment-operators.',
+    fix: 'Adjust bundler target to ES2020 in config',
     pkg: null,
     costKb: 0
   },
   'javascript.classes.private_class_fields': {
     effort: 2,
-    fix: 'Lower target in Vite/esbuild to "es2021" to transpile private class fields to WeakMap.',
+    fix: 'Lower target in Vite/esbuild to "es2021"',
     pkg: null,
     costKb: 0.5
   },
   'css.selectors.nesting': {
     effort: 2,
-    fix: 'Enable postcss-nested or @csstools/postcss-nesting in postcss.config.js to unnest CSS rules for older engines.',
+    fix: 'Enable postcss-nested in postcss.config.js',
     pkg: 'postcss-nested',
     costKb: 0
   },
   'css.types.color.color-mix': {
     effort: 2,
-    fix: 'Enable @csstools/postcss-color-mix or configure postcss-preset-env stage 2.',
+    fix: 'Enable @csstools/postcss-color-mix in PostCSS',
     pkg: 'postcss-preset-env',
     costKb: 0
   },
   'css.types.color.oklch': {
     effort: 2,
-    fix: 'Add @csstools/postcss-oklab-function plugin in postcss.config.js.',
+    fix: 'Add @csstools/postcss-oklab-function in PostCSS',
     pkg: '@csstools/postcss-oklab-function',
     costKb: 0
   },
