@@ -196,6 +196,10 @@ console.log(report.browserFloor);
 // { chrome: 120, safari: 17.2, firefox: 121, ... }
 ```
 
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our commit conventions, automated SemVer release pipeline, and development workflow.
+
 ## Licenses and Data Sources
 
 - Software licensed under the [MIT License](LICENSE).

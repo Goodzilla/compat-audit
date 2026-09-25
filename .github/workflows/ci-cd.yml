@@ -37,11 +37,13 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: write # Required to create git tags and GitHub Releases
+      contents: write
       id-token: write # Required for npm provenance
     steps:
-      - name: Checkout code
+      - name: Checkout code (full history for tags & SemVer)
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -52,47 +54,27 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check version and release status
-        id: check_status
-        run: |
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          echo "Package: $PACKAGE_NAME@$CURRENT_VERSION"
-          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
-
-          # 1. Check npm registry
-          PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "not_found")
-          echo "Registry version: $PUBLISHED_VERSION"
-
-          if [ "$PUBLISHED_VERSION" = "not_found" ] || [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
-            echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "New version detected: $CURRENT_VERSION will be published to npm."
-          else
-            echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            echo "Version $CURRENT_VERSION is already published on npm. Skipping npm publish."
-          fi
-
-          # 2. Check if git tag / GitHub release already exists
-          if git rev-parse "v$CURRENT_VERSION" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/v$CURRENT_VERSION" | grep -q "refs/tags/v$CURRENT_VERSION"; then
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-            echo "Git tag v$CURRENT_VERSION already exists. Skipping release."
-          else
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-            echo "Git tag v$CURRENT_VERSION does not exist yet. Will create GitHub Release."
-          fi
+      - name: Automatic SemVer bump
+        id: bump
+        run: node scripts/bump-version.js
 
       - name: Publish to npm
-        if: steps.check_status.outputs.should_publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Commit version bump to repository
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): bump version to ${{ steps.bump.outputs.version }} [skip ci]" || echo "No changes to commit"
+          git push origin main
+
       - name: Create GitHub Release & Changelog
-        if: steps.check_status.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.check_status.outputs.current_version }}
-          name: v${{ steps.check_status.outputs.current_version }}
+          tag_name: v${{ steps.bump.outputs.version }}
+          name: v${{ steps.bump.outputs.version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
