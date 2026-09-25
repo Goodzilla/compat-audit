@@ -18,6 +18,10 @@
   ],
   "author": "Ronan",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Goodzilla/compat-audit.git"
+  },
   "type": "module",
   "main": "src/index.js",
   "bin": {
