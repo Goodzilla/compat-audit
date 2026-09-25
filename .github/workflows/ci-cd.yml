@@ -52,37 +52,47 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Check version against registry
-        id: check_version
+      - name: Check version and release status
+        id: check_status
         run: |
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           echo "Package: $PACKAGE_NAME@$CURRENT_VERSION"
           echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
+          # 1. Check npm registry
           PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "not_found")
           echo "Registry version: $PUBLISHED_VERSION"
 
           if [ "$PUBLISHED_VERSION" = "not_found" ] || [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "New version detected: $CURRENT_VERSION will be published."
+            echo "New version detected: $CURRENT_VERSION will be published to npm."
           else
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            echo "Version $CURRENT_VERSION is already published on npm. Skipping publish."
+            echo "Version $CURRENT_VERSION is already published on npm. Skipping npm publish."
+          fi
+
+          # 2. Check if git tag / GitHub release already exists
+          if git rev-parse "v$CURRENT_VERSION" >/dev/null 2>&1 || git ls-remote --tags origin "refs/tags/v$CURRENT_VERSION" | grep -q "refs/tags/v$CURRENT_VERSION"; then
+            echo "should_release=false" >> "$GITHUB_OUTPUT"
+            echo "Git tag v$CURRENT_VERSION already exists. Skipping release."
+          else
+            echo "should_release=true" >> "$GITHUB_OUTPUT"
+            echo "Git tag v$CURRENT_VERSION does not exist yet. Will create GitHub Release."
           fi
 
       - name: Publish to npm
-        if: steps.check_version.outputs.should_publish == 'true'
+        if: steps.check_status.outputs.should_publish == 'true'
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release & Changelog
-        if: steps.check_version.outputs.should_publish == 'true'
+        if: steps.check_status.outputs.should_release == 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v${{ steps.check_version.outputs.current_version }}
-          name: v${{ steps.check_version.outputs.current_version }}
+          tag_name: v${{ steps.check_status.outputs.current_version }}
+          name: v${{ steps.check_status.outputs.current_version }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
