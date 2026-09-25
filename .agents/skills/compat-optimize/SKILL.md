@@ -6,74 +6,47 @@ disable-model-invocation: true
 
 # /compat-optimize — Interactive Compatibility Optimizer
 
-Apply low-hanging fruit optimizations identified by `compat-audit` to unlock older browser versions with minimal developer effort and zero unnecessary bundle overhead.
+Interactively apply low-hanging fruit optimizations identified by `compat-audit` to reach older browser baselines with minimal effort, zero bloat, and full safety.
 
----
-
-## Critical Rules for Agent Execution
-
+## Execution Rules
 1. **NEVER run ad-hoc inline Node scripts (`node -e '...'`)**:
-   Do NOT generate disposable inline node scripts or bash eval pipelines to patch code, inject polyfills, or parse ASTs. Inline commands change dynamically on every invocation, defeating IDE permission auto-approval and generating repetitive permission popups.
-2. **ALWAYS use standard file-editing tools**:
-   Use native file editing tools (`replace_file_content` / `write_to_file`) to apply polyfill imports, modify entry files, or update bundler configurations.
-3. **ALWAYS use canonical CLI commands**:
-   - Run `npx compat-audit <dir> --json` (or `node bin/compat-audit.js <dir> --json` inside this repository) to inspect the audit state before and after optimization.
-   - Run standard build commands (`npm run build`, `pnpm build`, `yarn build`, or `bun run build`). Standard commands can be approved once by the user.
-4. **Always confirm changes before editing**:
-   Draft the exact modifications and present them clearly to the user before modifying any source or configuration files.
+   Never generate dynamic eval scripts. Use native file tools (`replace_file_content`, `write_to_file`) for code changes.
+2. **Use canonical, prefix-matchable commands**:
+   - `npx compat-audit <dir> --json` (or `node bin/compat-audit.js <dir> --json` inside this repo).
+   - Standard build/test commands (`npm run build`, `npm test`).
+3. **Confirm all changes**: Draft and present the exact diff before writing to disk.
 
 ---
 
 ## Interactive Workflow
 
-### Step 1: Gather Current Audit State
-Check for compiled assets (`dist/`, `build/`, `.svelte-kit/output/client/`, `.next/static/`, `.output/public/`). If absent or outdated, build the project first:
-```bash
-npm run build
-```
-*(Use the project's detected package manager: `pnpm build`, `yarn build`, or `bun run build`).*
+### 1. Pre-flight & Current Audit State
+1. Check `git status --porcelain`: Warn the user if uncommitted changes exist to ensure full rollback safety.
+2. Ensure assets exist (run `npm run build` or detected PM: `pnpm`, `yarn`, `bun` if needed).
+3. Run `npx compat-audit dist/ --json` and parse results in memory.
 
-Execute the canonical audit command:
-```bash
-npx compat-audit dist/ --json
-```
-Parse the JSON response in memory to extract `browserFloor`, `coverage`, and `quickWins`.
+### 2. Baseline Alignment with the User
+1. Scan for declared targets (`.browserslistrc`, `vite.config.*`, `tsconfig.json`).
+   - If present: Confirm if the user wants to eliminate the drift and match that target.
+   - If absent: Suggest industry presets:
+     - **Baseline Widely Available** (~98% coverage: Chrome 105+, Safari 15.4+, Firefox 105+).
+     - **Enterprise / Conservative** (~99.5% coverage: Safari 14+, Chrome 90+, Firefox 91 ESR).
+2. Group audit `quickWins` into Effort 1 (Micro-polyfills, ~5m) and Effort 2 (Bundler/CSS configs, ~15m).
+3. Confirm the scope with the user (e.g. *Apply all Effort 1 + 2*, or *Effort 1 only*).
 
-### Step 2: Review and Select Scope with the User
-Present the available quick wins from the audit report grouped by effort tier:
+### 3. Draft Framework-Aware Code Modifications
+Present proposed diffs before applying:
+- **Effort 1 (Runtime micro-polyfills)**: Create dedicated `src/polyfills.ts` (or `.js`) with zero-dependency lightweight shims (<100B each, e.g. for `Array.prototype.at`, `Object.hasOwn`, or `@ungap/structured-clone`). Import it at line 1 of the detected framework entry (`src/main.ts`, `hooks.client.ts`, `app/layout.tsx`, etc.).
+- **Effort 2 (Bundler/CSS configs)**: Update Vite/PostCSS/Webpack/Babel configuration (e.g., enable `postcss-nested` or downlevel target).
 
-- **Effort 1: Trivial Runtime Micro-polyfills (~5 mins)**
-  - Targets: `Array.prototype.at`, `Object.hasOwn`, `Promise.allSettled`, `Promise.any`, `String.prototype.replaceAll`, `structuredClone`, `crypto.randomUUID`.
-  - Bundle cost: Typically < 1.5 KB total gzip.
-  - Integration: Client entry file or a dedicated `src/polyfills.ts` / `src/polyfills.js` loaded at bootstrap.
-- **Effort 2: Bundler & CSS Transformations (~15 mins)**
-  - Targets: Syntax downleveling (optional chaining, nullish coalescing, logical assignment) or CSS transforms (`postcss-nested`, `@csstools/postcss-oklab-function`, `postcss-preset-env`).
-  - Integration: `vite.config.*`, `webpack.config.*`, `postcss.config.*`, or `package.json#browserslist`.
+### 4. Apply Changes, Rebuild & Test
+1. Apply modifications using file-editing tools.
+2. Rebuild assets: `npm run build`.
+3. If tests exist, run `npm test` to verify no regressions.
+4. If build or tests fail, offer immediate rollback (`git restore .`).
 
-Prompt the user to confirm the desired remediation scope:
-1. **Apply all Effort 1 + Effort 2 fixes** (Recommended: Maximum compatibility gain for minimal effort).
-2. **Effort 1 only** (Micro-polyfills only, zero bundler changes).
-3. **Target a specific browser version** (e.g., "Bring Safari floor down to Safari 14+").
-
-### Step 3: Draft Proposed Modifications
-Display the exact proposed changes to the user before touching any files:
-- **Polyfill strategy**: Show the code snippet to be added to the client entry point or helper module.
-- **Configuration strategy**: Show the exact diff for Vite, PostCSS, Webpack, or Babel configuration.
-
-### Step 4: Apply Changes & Rebuild
-Once the user confirms:
-1. Apply changes using `write_to_file` or `replace_file_content`.
-2. Run the build command to produce fresh assets:
-   ```bash
-   npm run build
-   ```
-
-### Step 5: Validate Improvement (Before vs After)
-Re-run the audit:
-```bash
-npx compat-audit dist/ --json
-```
-Present a clean comparison summary:
-- **Browser Floor Delta**: Compare previous minimums against new minimums (e.g. *Safari 15.4+ ➔ Safari 14.1+*).
-- **Audience Reach Delta**: Population gain (e.g. *94.8% ➔ 98.4% (+3.6%)*).
-- **Bundle Weight Delta**: Added polyfill overhead (e.g. *+1.1 KB gzip*).
+### 5. Validate Improvement (Before vs After)
+Re-run `npx compat-audit dist/ --json` and display:
+- **Browser Floor Delta**: Before vs After (e.g., *Safari 15.4+ ➔ Safari 14.1+*).
+- **Audience Reach Gain**: Global coverage delta (e.g., *+3.4%*).
+- **Bundle Weight Delta**: Added size overhead (e.g., *+0.9 KB gzip*).
