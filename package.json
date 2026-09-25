@@ -1,0 +1,48 @@
+{
+  "name": "compat-audit",
+  "version": "1.0.0",
+  "description": "Zero-config production bundle browser compatibility auditor & quick-win optimizer",
+  "keywords": [
+    "browser-compatibility",
+    "bundle",
+    "audit",
+    "caniuse",
+    "mdn",
+    "baseline",
+    "vite",
+    "webpack",
+    "sveltekit",
+    "nextjs",
+    "roi",
+    "polyfill"
+  ],
+  "author": "Ronan",
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.js",
+  "bin": {
+    "compat-audit": "bin/compat-audit.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node bin/compat-audit.js",
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "@mdn/browser-compat-data": "^5.6.38",
+    "acorn": "^8.14.0",
+    "acorn-walk": "^8.3.4",
+    "caniuse-lite": "^1.0.30001700",
+    "css-tree": "^3.1.0",
+    "htmlparser2": "^10.0.0",
+    "picocolors": "^1.1.1"
+  }
+}
