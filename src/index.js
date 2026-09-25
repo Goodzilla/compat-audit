@@ -27,17 +27,9 @@ export function detectPackageManager(rootDir = process.cwd()) {
  */
 export async function auditBundle(options = {}) {
   const rootDir = options.cwd || process.cwd();
-  // Protect against repository pollution if pnpm is used
   const pm = detectPackageManager(rootDir);
-  const gitignorePath = path.join(rootDir, '.gitignore');
-  if (fs.existsSync(gitignorePath)) {
-    try {
-      const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
-      if (!gitignore.includes('.pnpm-store')) {
-        fs.appendFileSync(gitignorePath, '\n# pnpm store\n.pnpm-store\n');
-      }
-    } catch {}
-  }
+
+  let targetDir = options.dir ? path.resolve(rootDir, options.dir) : detectOutputDir(rootDir);
 
   // If build requested, unconditionally force fresh build to guarantee up-to-date assets
   if (options.build) {
