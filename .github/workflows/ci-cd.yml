@@ -37,7 +37,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write # Required to create git tags and GitHub Releases
       id-token: write # Required for npm provenance
     steps:
       - name: Checkout code
@@ -58,16 +58,17 @@ jobs:
           CURRENT_VERSION=$(node -p "require('./package.json').version")
           PACKAGE_NAME=$(node -p "require('./package.json').name")
           echo "Package: $PACKAGE_NAME@$CURRENT_VERSION"
+          echo "current_version=$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
 
           PUBLISHED_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "not_found")
           echo "Registry version: $PUBLISHED_VERSION"
 
           if [ "$PUBLISHED_VERSION" = "not_found" ] || [ "$CURRENT_VERSION" != "$PUBLISHED_VERSION" ]; then
             echo "should_publish=true" >> "$GITHUB_OUTPUT"
-            echo "🚀 New version detected: $CURRENT_VERSION will be published."
+            echo "New version detected: $CURRENT_VERSION will be published."
           else
             echo "should_publish=false" >> "$GITHUB_OUTPUT"
-            echo "ℹ️ Version $CURRENT_VERSION is already published on npm. Skipping publish."
+            echo "Version $CURRENT_VERSION is already published on npm. Skipping publish."
           fi
 
       - name: Publish to npm
@@ -75,3 +76,13 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release & Changelog
+        if: steps.check_version.outputs.should_publish == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.check_version.outputs.current_version }}
+          name: v${{ steps.check_version.outputs.current_version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

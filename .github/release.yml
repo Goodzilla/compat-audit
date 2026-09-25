@@ -1,0 +1,15 @@
+changelog:
+  categories:
+    - title: "Features & Improvements"
+      labels:
+        - "feature"
+        - "enhancement"
+    - title: "Bug Fixes"
+      labels:
+        - "fix"
+        - "bug"
+    - title: "Maintenance & Dependencies"
+      labels:
+        - "chore"
+        - "dependencies"
+        - "documentation"
