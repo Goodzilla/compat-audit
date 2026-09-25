@@ -52,6 +52,14 @@ export function detectOutputDir(baseDir = process.cwd()) {
   return null;
 }
 
+export const IGNORED_DIRS = new Set([
+  'node_modules',
+  '.pnpm-store',
+  '.git',
+  '.cache',
+  '.turbo'
+]);
+
 /**
  * Recursively find JS, CSS, and HTML assets in directory
  */
@@ -68,6 +76,7 @@ export function findAssetFiles(dir) {
     }
 
     for (const entry of entries) {
+      if (IGNORED_DIRS.has(entry.name)) continue;
       const full = path.join(current, entry.name);
       if (entry.isDirectory()) {
         walk(full);

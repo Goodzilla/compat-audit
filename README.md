@@ -10,7 +10,7 @@ Most compatibility tools run during static linting on raw source files. While us
 
 `compat-audit` is designed as a dual-purpose toolkit:
 1. **Universal AI Agent Skills Scaffolder**: Deploys native skills compatible across all major agent harnesses (Claude Code, Google Antigravity, OpenAI Codex, Cursor, Zed, OpenCode, Aider) to autonomously audit and interactively fix compatibility drift.
-2. **Deterministic CLI & CI/CD Engine**: Fast, zero-config AST scanner backed by MDN Browser Compat Data and Can I Use statistics.
+2. **Deterministic CLI & CI/CD Engine**: Fast, zero-config AST scanner backed by MDN Browser Compat Data and Can I Use statistics with automatic baseline standards resolution and headroom calculations.
 
 ---
 
@@ -30,10 +30,10 @@ Running `init` interactively prompts you to choose your desired scope:
 
 This scaffolds two production-ready skills:
 
-| Skill | Mode | Role |
+| Skill | Mode | Role & Capabilities |
 |---|---|---|
-| **`/compat-audit`** | Autonomous (Model-invocable) | Scans production bundles, calculates minimum browser support floors across Chrome, Safari, Firefox, and Edge, detects *Target vs Reality* drift, and traces internal library syntax leaks. |
-| **`/compat-optimize`** | Interactive (`disable-model-invocation: true`) | Guided interactive workflow: verifies Git safety, aligns with your target baseline (e.g. *Baseline Widely Available ~98%*), drafts modular micro-polyfills (`src/polyfills.ts`), applies bundler transforms, and validates improvements before/after. |
+| **`/compat-audit`** | Autonomous (Model-invocable) | Scans production bundles, calculates concrete minimum browser support floors across Chrome, Safari, Firefox, and Edge with baseline awareness (no misleading `Chrome all`), computes safety headroom against declared targets, detects source attribution (app code vs 3rd-party vendor leakage), and produces an adaptive 4-tier report. |
+| **`/compat-optimize`** | Interactive (`disable-model-invocation: true`) | Guided interactive workflow with **Context Reuse** (reuses previous audits without redundant re-builds), **Zero Repo Pollution** (ships an audited zero-dependency inline polyfill cookbook with **zero** `npm install`/`pnpm add` commands), and **1-Turn Turnaround** proposing unified diffs immediately. |
 
 ### How Agents Use These Skills
 
@@ -55,6 +55,7 @@ npx compat-audit [dir] [options]
 | Flag | Description | Default |
 |---|---|---|
 | `[dir]` | Target build directory (`dist`, `.output/public`, etc.) | Auto-detected |
+| `--build` | Force fresh build of production assets with detected package manager before scanning | `false` |
 | `init`, `--init-skills` | Scaffold AI agent skills (interactive local vs global prompt) | |
 | `--local`, `-l` | Install skills to project workspace (`.agents/skills/` + `.claude/skills/`) | `true` |
 | `--global`, `-g` | Install skills globally (`~/.agents/skills/`, `~/.claude/skills/`, etc.) | `false` |
@@ -70,8 +71,8 @@ npx compat-audit [dir] [options]
 Add `compat-audit` to your pull request workflow:
 
 ```bash
-# Fail CI if production bundle breaks target compatibility
-npx compat-audit dist/ --fail-on-incompatible --markdown >> $GITHUB_STEP_SUMMARY
+# Force fresh build and fail CI if production bundle breaks target compatibility
+npx compat-audit --build --fail-on-incompatible --markdown >> $GITHUB_STEP_SUMMARY
 ```
 
 ---
@@ -96,34 +97,56 @@ Issues detected in bundles are categorized into four deterministic effort tiers:
 ║                       COMPAT-AUDIT BUNDLE REPORT                          ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
-Scanned Directory: dist/
-Assets Scanned:    38 files (24 JS, 11 CSS, 3 HTML)
+Status:             COMPLIANT
+Scanned Directory:  dist
+Assets Scanned:     38 files (24 JS, 11 CSS, 3 HTML)
+Estimated Coverage: 100% global audience
+Compatibility Gap:  0% (Full target alignment)
+
+BROWSER COMPATIBILITY SUMMARY:
+   ✔ Chrome          (target: ES2015)     min: 51+     aligned
+   ✔ Safari          (target: ES2015)     min: 10+     aligned
+   ✔ Firefox         (target: ES2015)     min: 54+     aligned
+   ✔ Edge            (target: ES2015)     min: 15+     aligned
+   ✔ iOS Safari      (target: ES2015)     min: 10+     aligned
+   ✔ Chrome Android  (target: ES2015)     min: 51+     aligned
+
+ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
+   No immediate remediation required. Bundle meets or exceeds all declared targets.
+
+Run with --format json or --format markdown for CI/CD or PR integrations.
+```
+
+When compatibility gaps are detected:
+
+```
+╔═══════════════════════════════════════════════════════════════════════════╗
+║                       COMPAT-AUDIT BUNDLE REPORT                          ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+Status:             COMPATIBILITY GAP DETECTED
+Scanned Directory:  dist
+Assets Scanned:     12 files (8 JS, 4 CSS)
 Estimated Coverage: 95.1% global audience
+Compatibility Gap:  -4.9%
 
-EFFECTIVE BROWSER FLOOR (Minimum required versions):
-   Chrome 105+  |  Safari 15.4+  |  Firefox 105+  |  Edge 105+  |  iOS Safari 15.4+  |  Chrome Android 105+
+BROWSER COMPATIBILITY SUMMARY:
+   ✔ Chrome          (target: Chrome 90+)  min: 51+     +39 vers headroom
+   ⚠ Safari          (target: Safari 14+)  min: 15.4+   Gap: -1.4 vers
+   ✔ Firefox         (target: Firefox 88+) min: 54+     +34 vers headroom
+   ✔ Edge            (target: Edge 90+)    min: 15+     +75 vers headroom
 
-CONFIGURATION & BUNDLE DIAGNOSTICS:
-   ! Syntax vs Runtime Gap: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
-   ! CSS Nesting without fallback: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
+DIAGNOSTICS & CODE FINDINGS:
+   ! Syntax vs Runtime Gap: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone).
+   ! CSS Nesting without fallback: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5) will ignore these nested rules.
 
-RECOMMENDED REMEDIATIONS (Polyfills & Configuration):
+ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
    ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────┐
    │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                                     │
    ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────┤
-   │   E1  │ structuredClone()             │ api         │ ~5 mins     │ Import @ungap/structured-clone (1.2KB) in entry        │
-   │   E1  │ Array.prototype.at()          │ prototype   │ ~5 mins     │ Add tiny Array.prototype.at polyfill in entry          │
-   │   E1  │ Object.hasOwn()               │ builtin     │ ~5 mins     │ Add tiny Object.hasOwn polyfill in entry               │
+   │   E1  │ structuredClone()             │ api         │ ~5 mins     │ Inline structuredClone shim (<100B) in polyfills entry │
    │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in postcss.config.js             │
-   │   E2  │ OKLCH Colors                  │ css         │ ~15 mins    │ Add @csstools/postcss-oklab-function in PostCSS        │
    └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────┘
-   Legend: E1 = Lightweight runtime polyfill (~5m) | E2 = Bundler/PostCSS transpile config (~15m)
-
-ARCHITECTURAL CONSTRAINTS (Effort 3 & 4 - Requires Architectural Choice):
-   • ResizeObserver (api.ResizeObserver) : Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
-   • :has() selector (css.selectors.has) : Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
-
-Run with --format json or --format markdown for CI/CD or PR integrations.
 ```
 
 ---
@@ -135,14 +158,19 @@ You can also run audits programmatically in Node.js scripts or custom build pipe
 ```javascript
 import { auditBundle, initSkills } from 'compat-audit';
 
-// 1. Audit compiled assets
+// 1. Audit compiled assets (optionally force fresh build)
 const report = await auditBundle({
   dir: 'dist',
+  build: true, // Forces fresh build before scanning
   cwd: process.cwd()
 });
 
-console.log(report.browserFloor);
-// { chrome: 105, safari: 15.4, firefox: 105, edge: 105, ... }
+console.log(report.verdict); // 'COMPLIANT' or 'COMPATIBILITY GAP DETECTED'
+console.log(report.browserSummary);
+// [
+//   { browser: 'Chrome', declaredTarget: 'ES2015', minVersion: 51, status: 'compliant', ... },
+//   ...
+// ]
 
 // 2. Scaffold skills programmatically
 initSkills({ cwd: process.cwd() });

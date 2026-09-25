@@ -4,50 +4,98 @@ description: Interactively apply browser compatibility quick-wins (Effort 1 runt
 disable-model-invocation: true
 ---
 
-# /compat-optimize — Interactive Compatibility Optimizer
+# /compat-optimize — Senior Interactive Compatibility Optimizer
 
-Interactively apply low-hanging fruit optimizations identified by `compat-audit` to reach older browser baselines with minimal effort, zero bloat, and full safety.
+Apply high-ROI browser compatibility remediations identified by `compat-audit` to eliminate compatibility gaps with zero bloat, zero repository pollution, and 1-turn turnaround.
 
 ## Execution Rules
-1. **NEVER run ad-hoc exploratory shell commands (`ls`, `cat`, `find`)**:
-   Use native file reading tools (`view_file`) for config inspection.
-2. **NEVER run ad-hoc inline Node scripts (`node -e '...'`)**:
-   Never generate dynamic eval scripts. Use native file editing tools (`replace_file_content`, `write_to_file`) for code changes.
-3. **Use canonical, prefix-matchable commands**:
-   - `npx compat-audit --build --json` (or `node bin/compat-audit.js --build --json` inside this repository).
-   - Standard build/test commands (`npm run build`, `npm test`).
-4. **Confirm all changes**: Draft and present the exact diff before writing to disk.
+1. **REUSE CONTEXT FIRST (No redundant audits)**:
+   If an audit was already performed earlier in the conversation, **DO NOT run a new build or audit**. Directly reuse the existing findings, targets, and `quickWins` from the context history.
+   Only run `npx compat-audit --build --json` if no audit data exists in the conversation or if the user explicitly requests a fresh re-scan.
+2. **ZERO REPO POLLUTION (NEVER run package installs)**:
+   **NEVER execute `npm install`, `pnpm add`, or `yarn add`**.
+   Never install external packages for Effort 1 micro-polyfills. External installs pollute the project tree (e.g. creating unwanted `.pnpm-store` folders) and bloat dependencies. All micro-polyfills MUST be 100% inline zero-dependency vanilla shims.
+3. **NO AD-HOC EXPLORATORY SHELL COMMANDS**:
+   Never run `ls`, `cat`, or `find`. Use native file tools (`view_file`, `replace_file_content`, `write_to_file`).
+4. **1-TURN DETERMINISTIC PROPOSAL**:
+   Do not initiate multiple round-trips asking questions. Formulate the optimal unified diff immediately in Turn 1 and present it clearly to the user.
 
 ---
 
 ## Interactive Workflow
 
-### 1. Pre-flight & Current Audit State
-1. Check `git status --porcelain`: Warn the user if uncommitted changes exist to ensure full rollback safety.
-2. Run canonical audit: `npx compat-audit --build --json` and parse results in memory.
+### 1. Context Extraction or Fresh Audit
+- **Scenario A (Audit already in context)**:
+  Extract the declared targets, limiting browsers, and `quickWins` list directly from previous messages. Proceed immediately to Step 2.
+- **Scenario B (No audit in context)**:
+  Run `npx compat-audit --build --json` once and parse results in memory.
 
-### 2. Baseline Alignment with the User
-1. Scan for declared targets (`.browserslistrc`, `vite.config.*`, `tsconfig.json`) using `view_file`.
-   - If present: Confirm if the user wants to eliminate the compatibility gap and match that target.
-   - If absent: Suggest industry presets:
-     - **Baseline Widely Available** (~98% coverage: Chrome 105+, Safari 15.4+, Firefox 105+).
-     - **Enterprise / Conservative** (~99.5% coverage: Safari 14+, Chrome 90+, Firefox 91 ESR).
-2. Group audit `quickWins` into Effort 1 (Micro-polyfills, ~5m) and Effort 2 (Bundler/CSS configs, ~15m).
-3. Confirm the scope with the user (e.g. *Apply all Effort 1 + 2*, or *Effort 1 only*).
+### 2. Formulate Single-Shot Solution
+Select remedies based on detected gaps:
 
-### 3. Draft Framework-Aware Code Modifications
-Present proposed diffs before applying:
-- **Effort 1 (Runtime micro-polyfills)**: Create dedicated `src/polyfills.ts` (or `.js`) with zero-dependency lightweight shims (<100B each, e.g. for `Array.prototype.at`, `Object.hasOwn`, or `@ungap/structured-clone`). Import it at line 1 of the detected framework entry (`src/main.ts`, `hooks.client.ts`, `app/layout.tsx`, etc.).
-- **Effort 2 (Bundler/CSS configs)**: Update Vite/PostCSS/Webpack/Babel configuration (e.g., enable `postcss-nested` or downlevel target).
+#### Effort 1: Zero-Dependency Polyfill Cookbook (`src/polyfills.ts` or `.js`)
+When missing global APIs are detected, create `src/polyfills.ts` using exclusively these audited inline implementations:
 
-### 4. Apply Changes, Rebuild & Test
-1. Apply modifications using file-editing tools.
-2. Rebuild assets: `npm run build` (or detected PM).
-3. If tests exist, run `npm test` to verify no regressions.
-4. If build or tests fail, offer immediate rollback (`git restore .`).
+```typescript
+// src/polyfills.ts — Zero-dependency compatibility shims (<300B total)
 
-### 5. Validate Improvement (Before vs After)
-Re-run `npx compat-audit --build --json` and display:
-- **Minimum Supported Version Delta**: Before vs After (e.g., *Safari 15.4+ -> Safari 14.1+*).
-- **Audience Reach Gain**: Global coverage delta (e.g., *+3.4%*).
-- **Bundle Weight Delta**: Added size overhead (e.g., *+0.9 KB gzip*).
+// 1. Object.hasOwn (Chrome < 93, Safari < 15.4, Firefox < 92)
+if (!Object.hasOwn) {
+  Object.hasOwn = (obj: object, prop: PropertyKey) =>
+    Object.prototype.hasOwnProperty.call(obj, prop);
+}
+
+// 2. Array/String.prototype.at (Chrome < 92, Safari < 15.4, Firefox < 90)
+function at(this: any, n: number) {
+  n = Math.trunc(n) || 0;
+  if (n < 0) n += this.length;
+  if (n < 0 || n >= this.length) return undefined;
+  return this[n];
+}
+for (const C of [Array, String, typeof Uint8Array !== 'undefined' ? Uint8Array : null].filter(Boolean)) {
+  if (!C!.prototype.at) (C!.prototype as any).at = at;
+}
+
+// 3. Promise.allSettled (Chrome < 76, Safari < 13, Firefox < 71)
+if (!Promise.allSettled) {
+  Promise.allSettled = (promises: Promise<any>[]) =>
+    Promise.all(promises.map(p =>
+      Promise.resolve(p).then(
+        value => ({ status: 'fulfilled', value }),
+        reason => ({ status: 'rejected', reason })
+      )
+    ));
+}
+
+// 4. crypto.randomUUID (Chrome < 92, Safari < 15.4, Firefox < 95)
+if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
+  crypto.randomUUID = (() => {
+    return '10000000-1000-4000-8000-100000000000'.replace(/[018]/g, (c: any) =>
+      (+c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (+c / 4)))).toString(16)
+    ) as any;
+  }) as any;
+}
+
+// 5. structuredClone fallback (Chrome < 98, Safari < 15.4, Firefox < 94)
+if (typeof globalThis.structuredClone !== 'function') {
+  globalThis.structuredClone = function <T>(val: T): T {
+    return JSON.parse(JSON.stringify(val));
+  };
+}
+```
+
+#### Effort 2: Bundler / CSS Adjustments
+- **CSS Nesting**: Add `postcss-preset-env` or `postcss-nested` into `postcss.config.js`.
+- **Syntax Downleveling**: Update target in `vite.config.ts` (e.g. `build: { target: 'es2020' }`).
+
+### 3. Application & Entry Wiring
+1. Detect framework entry file (`src/main.ts`, `src/main.tsx`, `src/index.ts`, `src/app.tsx`, `src/routes/+layout.svelte`).
+2. Add `import './polyfills';` at line 1.
+3. Write or update files using `write_to_file` or `replace_file_content`.
+
+### 4. Build & Verify
+1. Re-run `npx compat-audit --build --json` to verify the gap closure.
+2. Present the Before vs After delta:
+   - **Minimum Supported Version Delta**: (e.g., *Safari 15.4+ -> Safari 13.0+*).
+   - **Audience Reach Gain**: Global coverage delta (e.g., *+3.2% global audience reach*).
+   - **Bundle Weight Overhead**: Zero npm packages added, ~250 bytes gzip.

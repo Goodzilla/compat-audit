@@ -12,9 +12,9 @@ Audit compiled production assets against MDN and CanIUse to determine real minim
    Use native file reading tools (`view_file`) to inspect `package.json`, `tsconfig.json`, or bundler configs. Running exploratory terminal commands causes unnecessary authorization friction.
 2. **NEVER run ad-hoc inline Node scripts (`node -e '...'`)**:
    All AST parsing and CanIUse/MDN evaluations are built directly into `compat-audit`.
-3. **ALWAYS use the canonical CLI command with `--build`**:
+3. **ALWAYS force fresh build with `--build`**:
    `npx compat-audit --build --json` (or `node bin/compat-audit.js --build --json` inside this repository).
-   The `--build` flag automatically detects if the build output is missing and compiles assets in a single step using the detected package manager.
+   The `--build` flag forces an unconditional fresh build using the detected package manager, guaranteeing that audits never evaluate stale build output.
 4. **Parse JSON in memory**: Extract `verdict`, `hasGaps`, `coverage`, `audienceLoss`, `browserSummary`, `diagnostics`, `quickWins`, and `structuralBlockers`.
 
 ---
@@ -26,7 +26,7 @@ Audit compiled production assets against MDN and CanIUse to determine real minim
 - Do not run manual shell discovery.
 
 ### 2. Execution
-Run the single canonical audit command:
+Run the canonical audit command (forces fresh build + scans in 1 step):
 ```bash
 npx compat-audit --build --json
 ```
@@ -52,6 +52,7 @@ Render the markdown table:
 *Never output `all` (e.g. `Chrome all`); always report the concrete minimum supported version supporting the detected baseline.*
 
 #### 3. Diagnostics & Code Findings *(Render only if issues exist)*
+- **Source Attribution**: Distinguish whether modern syntax/APIs originate from application code vs 3rd-party vendor dependencies (`origin: 'vendor'`).
 - **Monorepo / Shared Package Leakage**: Internal libraries leaking untranspiled syntax (`?.`, `??`, private fields) or native CSS nesting.
 - **Runtime Web APIs without polyfills**: APIs like `structuredClone`, `ResizeObserver`, or `Array.prototype.at`.
 

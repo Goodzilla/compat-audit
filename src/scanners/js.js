@@ -12,6 +12,9 @@ export class JsScanner {
   scan(code, filename = 'chunk.js') {
     const findings = new Map();
 
+    const isVendor = /vendor|node_modules|chunks?\/vendor/i.test(filename);
+    const origin = isVendor ? 'vendor' : 'app';
+
     const addFinding = (featureKey, name, type) => {
       if (findings.has(featureKey)) return;
       const bcdPath = featureKey.startsWith('javascript.') || featureKey.startsWith('api.')
@@ -25,6 +28,7 @@ export class JsScanner {
           featureKey,
           name,
           category: type,
+          origin,
           support,
           file: filename,
           description: compat.description || name

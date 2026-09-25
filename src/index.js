@@ -27,13 +27,22 @@ export function detectPackageManager(rootDir = process.cwd()) {
  */
 export async function auditBundle(options = {}) {
   const rootDir = options.cwd || process.cwd();
-  let targetDir = options.dir ? path.resolve(rootDir, options.dir) : detectOutputDir(rootDir);
-
-  // If build requested and output directory is missing or empty, auto-build
-  if (options.build && (!targetDir || !fs.existsSync(targetDir) || findAssetFiles(targetDir).length === 0)) {
-    const pm = detectPackageManager(rootDir);
+  // Protect against repository pollution if pnpm is used
+  const pm = detectPackageManager(rootDir);
+  const gitignorePath = path.join(rootDir, '.gitignore');
+  if (fs.existsSync(gitignorePath)) {
     try {
-      console.log(`Auto-building production assets with ${pm}...`);
+      const gitignore = fs.readFileSync(gitignorePath, 'utf-8');
+      if (!gitignore.includes('.pnpm-store')) {
+        fs.appendFileSync(gitignorePath, '\n# pnpm store\n.pnpm-store\n');
+      }
+    } catch {}
+  }
+
+  // If build requested, unconditionally force fresh build to guarantee up-to-date assets
+  if (options.build) {
+    try {
+      console.log(`Building fresh production assets with ${pm}...`);
       execSync(`${pm} run build`, { cwd: rootDir, stdio: 'inherit' });
       targetDir = options.dir ? path.resolve(rootDir, options.dir) : detectOutputDir(rootDir);
     } catch (err) {

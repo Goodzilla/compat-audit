@@ -97,3 +97,27 @@ describe('Report formatters and English terminology', () => {
     assert.ok(!term.includes('Chrome all'), 'Must not contain "Chrome all"');
   });
 });
+
+import { CompatDatabase } from '../src/data/compat-db.js';
+import { JsScanner } from '../src/scanners/js.js';
+import { IGNORED_DIRS } from '../src/adapters/output-detector.js';
+
+describe('Source attribution & directory exclusion tests', () => {
+  it('correctly attributes origin to app code vs vendor dependencies', () => {
+    const db = new CompatDatabase();
+    const scanner = new JsScanner(db);
+
+    const appCode = `const x = a?.b;`;
+    const appFindings = scanner.scan(appCode, 'src/components/Modal.js');
+    assert.equal(appFindings[0].origin, 'app');
+
+    const vendorFindings = scanner.scan(appCode, 'dist/chunks/vendor-lucide.js');
+    assert.equal(vendorFindings[0].origin, 'vendor');
+  });
+
+  it('safeguards against repository pollution by ignoring dangerous directories', () => {
+    assert.ok(IGNORED_DIRS.has('.pnpm-store'));
+    assert.ok(IGNORED_DIRS.has('node_modules'));
+    assert.ok(IGNORED_DIRS.has('.git'));
+  });
+});
