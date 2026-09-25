@@ -9,22 +9,26 @@
 Most compatibility tools run during static linting on raw source files. While useful, static linting misses what actually reaches users in production: bundlers transpile syntax but do not polyfill runtime Web APIs (`structuredClone`, `crypto.randomUUID`, `ResizeObserver`), third-party packages in `node_modules` inject unconfigured modern CSS (`&` nesting, `oklch`), and internal monorepo libraries leak untranspiled syntax.
 
 `compat-audit` is designed as a dual-purpose toolkit:
-1. **AI Agent Skills Scaffolder**: Deploys native skills to empower AI coding agents (Google Antigravity, Claude Code, Cursor) to autonomously audit and interactively fix compatibility drift.
+1. **Universal AI Agent Skills Scaffolder**: Deploys native skills compatible across all major agent harnesses (Claude Code, Google Antigravity, OpenAI Codex, Cursor, Zed, OpenCode, Aider) to autonomously audit and interactively fix compatibility drift.
 2. **Deterministic CLI & CI/CD Engine**: Fast, zero-config AST scanner backed by MDN Browser Compat Data and Can I Use statistics.
 
 ---
 
 ## Instant Setup: Scaffold AI Agent Skills
 
-Add native compatibility skills to your repository with a single command:
+Add native compatibility skills to your project or machine with a single command:
 
 ```bash
 npx compat-audit --init-skills
 ```
 
-*(Or install machine-wide across all your projects: `npx compat-audit --init-skills --global`)*
+Running `init` interactively prompts you to choose your desired scope:
+1. **Project workspace**: Installs to `.agents/skills/` (the open agent standard) and creates a `.claude/skills/` bridge so the skills work across Claude Code, Antigravity, Codex, Cursor, Zed, and OpenCode.
+2. **Global (machine-wide)**: Installs to `~/.agents/skills/`, `~/.claude/skills/`, and `~/.gemini/config/skills/` for instant availability across every repository on your machine.
 
-This scaffolds two production-ready skills into `.agents/skills/`:
+*(You can bypass the prompt with `--local` / `-l` or `--global` / `-g`)*.
+
+This scaffolds two production-ready skills:
 
 | Skill | Mode | Role |
 |---|---|---|
@@ -51,8 +55,9 @@ npx compat-audit [dir] [options]
 | Flag | Description | Default |
 |---|---|---|
 | `[dir]` | Target build directory (`dist`, `.output/public`, etc.) | Auto-detected |
-| `init`, `--init-skills` | Scaffold AI agent skills into `.agents/skills/` | |
-| `--global`, `-g` | Install skills globally to `~/.gemini/config/skills/` (with `init`) | `false` |
+| `init`, `--init-skills` | Scaffold AI agent skills (interactive local vs global prompt) | |
+| `--local`, `-l` | Install skills to project workspace (`.agents/skills/` + `.claude/skills/`) | `true` |
+| `--global`, `-g` | Install skills globally (`~/.agents/skills/`, `~/.claude/skills/`, etc.) | `false` |
 | `--format <type>` | Output format: `terminal` (default), `json`, `markdown` | `terminal` |
 | `--json` | Shorthand for `--format json` | |
 | `--markdown`, `--md` | Shorthand for `--format markdown` | |

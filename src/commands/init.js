@@ -107,15 +107,39 @@ Re-run \`npx compat-audit dist/ --json\` and display:
 - **Bundle Weight Delta**: Added size overhead (e.g., *+0.9 KB gzip*).
 `;
 
-/**
- * Scaffolds AI agent skills into local workspace or global agent directory
- */
-export function initSkills(options = {}) {
-  const isGlobal = Boolean(options.global);
-  const baseDir = isGlobal
-    ? path.join(os.homedir(), '.gemini', 'config', 'skills')
-    : path.resolve(options.cwd || process.cwd(), '.agents', 'skills');
+import readline from 'node:readline/promises';
+import { stdin as input, stdout as output } from 'node:process';
 
+/**
+ * Interactively prompt the user for installation scope if running in a TTY
+ */
+export async function promptScope() {
+  if (!process.stdin.isTTY) {
+    return 'local';
+  }
+
+  const rl = readline.createInterface({ input, output });
+  console.log('');
+  console.log('Where would you like to install the AI agent skills?');
+  console.log('  1) Project workspace (.agents/skills/ + .claude/ bridge - recommended)');
+  console.log('  2) Global (machine-wide for Claude Code, Codex, Antigravity, Cursor, Zed, OpenCode)');
+  console.log('');
+
+  try {
+    const answer = await rl.question('Select an option (1-2) [default: 1]: ');
+    rl.close();
+    const trimmed = answer.trim();
+    if (trimmed === '2' || trimmed.toLowerCase() === 'global' || trimmed.toLowerCase() === 'g') {
+      return 'global';
+    }
+    return 'local';
+  } catch {
+    rl.close();
+    return 'local';
+  }
+}
+
+function writeSkillsTo(baseDir, filesCreated) {
   const auditSkillDir = path.join(baseDir, 'compat-audit');
   const optimizeSkillDir = path.join(baseDir, 'compat-optimize');
 
@@ -128,9 +152,88 @@ export function initSkills(options = {}) {
   fs.writeFileSync(auditPath, COMPAT_AUDIT_SKILL, 'utf-8');
   fs.writeFileSync(optimizePath, COMPAT_OPTIMIZE_SKILL, 'utf-8');
 
+  filesCreated.push(auditPath, optimizePath);
+}
+
+function bridgeSkills(sourceBaseDir, targetBaseDir, filesCreated, isRelative = false) {
+  try {
+    fs.mkdirSync(targetBaseDir, { recursive: true });
+    for (const skillName of ['compat-audit', 'compat-optimize']) {
+      const targetDir = path.join(targetBaseDir, skillName);
+      const sourceDir = path.join(sourceBaseDir, skillName);
+
+      try {
+        if (fs.existsSync(targetDir)) {
+          const stat = fs.lstatSync(targetDir);
+          if (stat.isSymbolicLink() || stat.isDirectory()) {
+            fs.rmSync(targetDir, { recursive: true, force: true });
+          }
+        }
+        const linkTarget = isRelative
+          ? path.relative(targetBaseDir, sourceDir)
+          : sourceDir;
+
+        fs.symlinkSync(linkTarget, targetDir, 'dir');
+        filesCreated.push(path.join(targetDir, 'SKILL.md'));
+      } catch {
+        // Fallback to copy if symlinks not supported
+        fs.mkdirSync(targetDir, { recursive: true });
+        const targetFile = path.join(targetDir, 'SKILL.md');
+        const sourceFile = path.join(sourceDir, 'SKILL.md');
+        if (fs.existsSync(sourceFile)) {
+          fs.copyFileSync(sourceFile, targetFile);
+          filesCreated.push(targetFile);
+        }
+      }
+    }
+  } catch {}
+}
+
+/**
+ * Scaffolds AI agent skills into local workspace or global agent directories
+ * supporting all major AI agent harnesses (Claude Code, Codex, Antigravity, Cursor, Zed, OpenCode)
+ */
+export function initSkills(options = {}) {
+  const isGlobal = Boolean(options.global);
+  const filesCreated = [];
+  const harnessesSupported = [];
+
+  if (isGlobal) {
+    const homeDir = options.homeDir || os.homedir();
+
+    // 1. Universal Agent Standard: ~/.agents/skills/ (Codex, OpenCode, Cursor, Zed, Aider)
+    const homeAgents = path.join(homeDir, '.agents', 'skills');
+    writeSkillsTo(homeAgents, filesCreated);
+    harnessesSupported.push('Universal Agent Standard (~/.agents/skills/)');
+
+    // 2. Claude Code global: ~/.claude/skills/
+    const homeClaude = path.join(homeDir, '.claude', 'skills');
+    bridgeSkills(homeAgents, homeClaude, filesCreated);
+    harnessesSupported.push('Claude Code (~/.claude/skills/)');
+
+    // 3. Google Antigravity global: ~/.gemini/config/skills/
+    const homeGemini = path.join(homeDir, '.gemini', 'config', 'skills');
+    bridgeSkills(homeAgents, homeGemini, filesCreated);
+    harnessesSupported.push('Google Antigravity (~/.gemini/config/skills/)');
+  } else {
+    const projectRoot = options.cwd || process.cwd();
+
+    // 1. Universal Agent Standard: .agents/skills/ (Antigravity, Codex, Cursor, Zed, OpenCode)
+    const agentsDir = path.join(projectRoot, '.agents', 'skills');
+    writeSkillsTo(agentsDir, filesCreated);
+    harnessesSupported.push('Universal Agent Standard (.agents/skills/)');
+
+    // 2. Claude Code workspace bridge: .claude/skills/
+    const claudeDir = path.join(projectRoot, '.claude', 'skills');
+    bridgeSkills(agentsDir, claudeDir, filesCreated, true);
+    harnessesSupported.push('Claude Code (.claude/skills/)');
+  }
+
   return {
     isGlobal,
-    baseDir,
-    filesCreated: [auditPath, optimizePath]
+    harnessesSupported,
+    filesCreated
   };
 }
+
+
