@@ -9,12 +9,14 @@ disable-model-invocation: true
 Interactively apply low-hanging fruit optimizations identified by `compat-audit` to reach older browser baselines with minimal effort, zero bloat, and full safety.
 
 ## Execution Rules
-1. **NEVER run ad-hoc inline Node scripts (`node -e '...'`)**:
-   Never generate dynamic eval scripts. Use native file tools (`replace_file_content`, `write_to_file`) for code changes.
-2. **Use canonical, prefix-matchable commands**:
-   - `npx compat-audit <dir> --json` (or `node bin/compat-audit.js <dir> --json` inside this repo).
+1. **NEVER run ad-hoc exploratory shell commands (`ls`, `cat`, `find`)**:
+   Use native file reading tools (`view_file`) for config inspection.
+2. **NEVER run ad-hoc inline Node scripts (`node -e '...'`)**:
+   Never generate dynamic eval scripts. Use native file editing tools (`replace_file_content`, `write_to_file`) for code changes.
+3. **Use canonical, prefix-matchable commands**:
+   - `npx compat-audit --build --json` (or `node bin/compat-audit.js --build --json` inside this repository).
    - Standard build/test commands (`npm run build`, `npm test`).
-3. **Confirm all changes**: Draft and present the exact diff before writing to disk.
+4. **Confirm all changes**: Draft and present the exact diff before writing to disk.
 
 ---
 
@@ -22,12 +24,11 @@ Interactively apply low-hanging fruit optimizations identified by `compat-audit`
 
 ### 1. Pre-flight & Current Audit State
 1. Check `git status --porcelain`: Warn the user if uncommitted changes exist to ensure full rollback safety.
-2. Ensure assets exist (run `npm run build` or detected PM: `pnpm`, `yarn`, `bun` if needed).
-3. Run `npx compat-audit dist/ --json` and parse results in memory.
+2. Run canonical audit: `npx compat-audit --build --json` and parse results in memory.
 
 ### 2. Baseline Alignment with the User
-1. Scan for declared targets (`.browserslistrc`, `vite.config.*`, `tsconfig.json`).
-   - If present: Confirm if the user wants to eliminate the drift and match that target.
+1. Scan for declared targets (`.browserslistrc`, `vite.config.*`, `tsconfig.json`) using `view_file`.
+   - If present: Confirm if the user wants to eliminate the compatibility gap and match that target.
    - If absent: Suggest industry presets:
      - **Baseline Widely Available** (~98% coverage: Chrome 105+, Safari 15.4+, Firefox 105+).
      - **Enterprise / Conservative** (~99.5% coverage: Safari 14+, Chrome 90+, Firefox 91 ESR).
@@ -41,12 +42,12 @@ Present proposed diffs before applying:
 
 ### 4. Apply Changes, Rebuild & Test
 1. Apply modifications using file-editing tools.
-2. Rebuild assets: `npm run build`.
+2. Rebuild assets: `npm run build` (or detected PM).
 3. If tests exist, run `npm test` to verify no regressions.
 4. If build or tests fail, offer immediate rollback (`git restore .`).
 
 ### 5. Validate Improvement (Before vs After)
-Re-run `npx compat-audit dist/ --json` and display:
-- **Browser Floor Delta**: Before vs After (e.g., *Safari 15.4+ -> Safari 14.1+*).
+Re-run `npx compat-audit --build --json` and display:
+- **Minimum Supported Version Delta**: Before vs After (e.g., *Safari 15.4+ -> Safari 14.1+*).
 - **Audience Reach Gain**: Global coverage delta (e.g., *+3.4%*).
 - **Bundle Weight Delta**: Added size overhead (e.g., *+0.9 KB gzip*).

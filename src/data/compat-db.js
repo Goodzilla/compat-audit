@@ -14,6 +14,46 @@ export const TARGET_BROWSERS = [
 ];
 
 /**
+ * Baseline standard floor maps for common ECMAScript & bundler targets
+ */
+export const BASELINE_STANDARDS = {
+  es5: { chrome: 4, safari: 5, firefox: 4, edge: 12, ios_saf: 4.2, chrome_android: 18 },
+  es2015: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51 },
+  es6: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51 },
+  es2016: { chrome: 52, safari: 10.1, firefox: 54, edge: 15, ios_saf: 10.3, chrome_android: 52 },
+  es2017: { chrome: 58, safari: 11, firefox: 54, edge: 15, ios_saf: 11, chrome_android: 58 },
+  es2018: { chrome: 64, safari: 11.1, firefox: 58, edge: 79, ios_saf: 11.3, chrome_android: 64 },
+  es2019: { chrome: 73, safari: 12.1, firefox: 66, edge: 79, ios_saf: 12.2, chrome_android: 73 },
+  es2020: { chrome: 80, safari: 13.1, firefox: 78, edge: 80, ios_saf: 13.4, chrome_android: 80 },
+  es2021: { chrome: 85, safari: 14.1, firefox: 85, edge: 85, ios_saf: 14.5, chrome_android: 85 },
+  es2022: { chrome: 94, safari: 15.4, firefox: 93, edge: 94, ios_saf: 15.4, chrome_android: 94 },
+  es2023: { chrome: 110, safari: 16.4, firefox: 115, edge: 110, ios_saf: 16.4, chrome_android: 110 }
+};
+
+/**
+ * Resolve baseline floor versions for a given target standard
+ */
+export function getBaselineSupport(targetName) {
+  if (!targetName || typeof targetName !== 'string') {
+    return BASELINE_STANDARDS.es2015;
+  }
+  const normalized = targetName.toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (normalized === 'modules' || normalized === 'vite') {
+    return BASELINE_STANDARDS.es2020;
+  }
+  if (BASELINE_STANDARDS[normalized]) {
+    return BASELINE_STANDARDS[normalized];
+  }
+  // Check prefix match (e.g. es2015 in es2015node24)
+  for (const key of Object.keys(BASELINE_STANDARDS)) {
+    if (normalized.includes(key)) {
+      return BASELINE_STANDARDS[key];
+    }
+  }
+  return BASELINE_STANDARDS.es2015;
+}
+
+/**
  * Clean version string to comparable number/string
  */
 export function normalizeVersion(ver) {

@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { TARGET_BROWSERS, getBaselineSupport } from '../data/compat-db.js';
 
 /**
  * Inspect project configuration files to detect declared browser targets and bundler settings
@@ -89,7 +90,71 @@ export function inspectProjectConfig(baseDir = process.cwd()) {
     }
   }
 
+  // 4. Check tsconfig.json if target not yet set
+  if (!config.target) {
+    const tsconfigPaths = ['tsconfig.json', 'tsconfig.base.json'];
+    for (const dir of searchDirs) {
+      for (const tp of tsconfigPaths) {
+        const full = path.join(dir, tp);
+        if (fs.existsSync(full)) {
+          try {
+            const raw = fs.readFileSync(full, 'utf-8');
+            const m = raw.match(/"target"\s*:\s*"([^"]+)"/i);
+            if (m) {
+              config.target = m[1];
+              const rel = path.relative(baseDir, full);
+              if (!config.configsFound.includes(rel)) config.configsFound.push(rel);
+              break;
+            }
+          } catch {}
+        }
+      }
+      if (config.target) break;
+    }
+  }
+
   return config;
+}
+
+/**
+ * Resolve declared browser target versions and labels
+ */
+export function resolveDeclaredTargets(config = {}) {
+  const result = {};
+  const targetLabel = config.target || 'ES2015';
+
+  const baselineSupport = getBaselineSupport(targetLabel);
+
+  for (const b of TARGET_BROWSERS) {
+    let ver = baselineSupport[b.key] || 1;
+    let label = targetLabel;
+
+    if (typeof config.target === 'string') {
+      const regex = new RegExp(`${b.key}\\s*([0-9.]+)`, 'i');
+      const m = config.target.match(regex);
+      if (m) {
+        ver = parseFloat(m[1]);
+        label = `${b.name} ${ver}+`;
+      }
+    } else if (Array.isArray(config.target)) {
+      for (const item of config.target) {
+        const regex = new RegExp(`^${b.key}([0-9.]+)$`, 'i');
+        const m = String(item).match(regex);
+        if (m) {
+          ver = parseFloat(m[1]);
+          label = `${b.name} ${ver}+`;
+        }
+      }
+    }
+
+    result[b.key] = {
+      browser: b.name,
+      targetVersion: ver,
+      label
+    };
+  }
+
+  return { targetLabel, browsers: result };
 }
 
 /**

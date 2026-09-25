@@ -9,6 +9,7 @@ export async function runCli(argv = []) {
   let dir = null;
   let format = 'terminal';
   let failOnIncompatible = false;
+  let build = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -55,6 +56,8 @@ export async function runCli(argv = []) {
       format = 'json';
     } else if (arg === '--markdown' || arg === '--md') {
       format = 'markdown';
+    } else if (arg === '--build') {
+      build = true;
     } else if (arg === '--fail-on-incompatible') {
       failOnIncompatible = true;
     } else if (!arg.startsWith('-') && !dir) {
@@ -63,7 +66,7 @@ export async function runCli(argv = []) {
   }
 
   try {
-    const report = await auditBundle({ dir });
+    const report = await auditBundle({ dir, build });
 
     if (format === 'json') {
       console.log(formatJsonReport(report));
@@ -95,6 +98,7 @@ Arguments:
   dir                   Target directory containing compiled assets (auto-detected if omitted)
 
 Options:
+  --build               Auto-build production assets using detected package manager if output is missing
   --local, -l           Install skills to project workspace (.agents/skills/) without prompting
   --global, -g          Install skills globally to ~/.agents/skills/ and ~/.gemini/config/skills/
   --format <type>       Output format: terminal (default), json, markdown
