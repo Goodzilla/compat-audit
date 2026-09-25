@@ -86,4 +86,49 @@ describe('compat-audit core engine tests', () => {
     const issue3 = scoreIssue('css.selectors.has', ':has()', 'selector', {}, null);
     assert.equal(issue3.effort, 4, ':has() should be Effort 4 (structural refactor)');
   });
+
+  it('detects Safari and WebKit visual quirks and rendering traps in CSS', () => {
+    const css = `
+      .glass {
+        backdrop-filter: blur(10px);
+      }
+      .fullscreen {
+        height: 100vh;
+      }
+      .card-media {
+        flex: 1;
+        aspect-ratio: 16 / 9;
+      }
+      .sticky-header {
+        position: sticky;
+        overflow: hidden;
+      }
+      .clamped {
+        line-clamp: 2;
+      }
+      input.search {
+        border-radius: 8px;
+        background: white;
+      }
+      html {
+        text-size-adjust: 100%;
+      }
+    `;
+
+    const findings = cssScanner.scan(css, 'safari-test.css');
+    const keys = findings.map(f => f.featureKey);
+
+    assert.ok(keys.includes('safari.css.backdrop-filter-prefix'), 'Should detect missing -webkit-backdrop-filter');
+    assert.ok(keys.includes('safari.css.100vh-viewport'), 'Should detect 100vh viewport unit without dvh');
+    assert.ok(keys.includes('safari.css.aspect-ratio-flex'), 'Should detect aspect-ratio on flex item');
+    assert.ok(keys.includes('safari.css.sticky-overflow-trap'), 'Should detect sticky combined with overflow');
+    assert.ok(keys.includes('safari.css.line-clamp-prefix'), 'Should detect un-prefixed line-clamp');
+    assert.ok(keys.includes('safari.css.appearance-none'), 'Should detect form control without appearance: none');
+    assert.ok(keys.includes('safari.css.text-size-adjust'), 'Should detect text-size-adjust without -webkit-');
+
+    // Test scoring for Safari quirks
+    const quirkScore = scoreIssue('safari.css.backdrop-filter-prefix', 'Missing -webkit-backdrop-filter', 'safari-quirk', {}, null);
+    assert.equal(quirkScore.effort, 1);
+    assert.ok(quirkScore.remediation.includes('-webkit-backdrop-filter'));
+  });
 });

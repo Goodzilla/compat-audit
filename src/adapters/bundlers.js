@@ -185,5 +185,15 @@ export function compareIntentVsReality(config, findings) {
     });
   }
 
+  // Check Safari & WebKit visual quirks
+  const safariQuirks = findings.filter(f => f.category === 'safari-quirk');
+  if (safariQuirks.length > 0) {
+    notes.push({
+      type: 'warning',
+      title: 'Safari & WebKit Visual Quirks Detected',
+      message: `Detected ${safariQuirks.length} WebKit rendering pitfall(s): ${safariQuirks.map(q => q.name).join(', ')}. Safari requires dedicated vendor prefixes (-webkit-) and graceful degradation for layout stability.`
+    });
+  }
+
   return notes;
 }

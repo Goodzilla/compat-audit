@@ -15,7 +15,7 @@ Static linters analyze raw source code, missing runtime realities:
 - Third-party packages in `node_modules` inject untranspiled CSS (`&` nesting, `oklch()`, `@container`) and modern syntax leaks directly into production chunks.
 - Internal monorepo packages often bypass application-level Babel/Vite downleveling.
 
-`compat-audit` parses the AST of compiled production bundles (`dist/`, `build/`, `.output/`) and evaluates findings against MDN Browser Compatibility Data and Can I Use statistics. It computes real browser support floors, detects drift against declared targets, and provides deterministic remediation plans.
+`compat-audit` parses the AST of compiled production bundles (`dist/`, `build/`, `.output/`) and evaluates findings against MDN Browser Compatibility Data and Can I Use statistics across **both Desktop and Mobile browser engines** (Chrome, Safari, Firefox, Edge, iOS Safari, Chrome Android, Samsung Internet). It computes real browser support floors, detects Safari & WebKit visual quirks (viewport jumps, missing prefixes, flexbox blowouts), detects drift against declared targets, and provides deterministic remediation plans.
 
 ---
 
@@ -97,17 +97,21 @@ Audit reports are structured into four adaptive sections:
 Status:             COMPATIBILITY GAP DETECTED
 Scanned Directory:  dist
 Assets Scanned:     14 files (8 JS, 4 CSS, 2 HTML)
-Estimated Coverage: 95.1% global audience
-Compatibility Gap:  -4.9%
+Estimated Coverage: 94.6% global audience
+Compatibility Gap:  -5.4%
 
 BROWSER COMPATIBILITY SUMMARY:
-   [PASS] Chrome          (target: Chrome 90+)  min: 51+     +39 vers headroom
-   [FAIL] Safari          (target: Safari 14+)  min: 15.4+   Gap: -1.4 vers
-   [PASS] Firefox         (target: Firefox 88+) min: 54+     +34 vers headroom
-   [PASS] Edge            (target: Edge 90+)    min: 15+     +75 vers headroom
+   ✔ [Desk]   Chrome           (target: Chrome 90+)  min: 51+     +39 vers headroom
+   ⚠ [Desk]   Safari           (target: Safari 14+)  min: 18+     Gap: -4.0 vers
+   ✔ [Desk]   Firefox          (target: Firefox 88+) min: 54+     +34 vers headroom
+   ✔ [Desk]   Edge             (target: Edge 90+)    min: 15+     +75 vers headroom
+   ⚠ [Mobile] iOS Safari       (target: iOS 14+)     min: 18+     Gap: -4.0 vers
+   ✔ [Mobile] Chrome Android   (target: Chrome 90+)  min: 51+     +39 vers headroom
+   ✔ [Mobile] Samsung Internet (target: Samsung 14+) min: 5.0+    +9 vers headroom
 
 DIAGNOSTICS & CODE FINDINGS:
    ! Syntax vs Runtime Gap: Target is 'es2020', but bundle contains unpolyfilled global APIs (structuredClone).
+   ! Safari & WebKit Visual Quirks Detected: Missing -webkit-backdrop-filter prefix, 100vh height without dvh fallback.
    ! CSS Nesting without fallback: Native nesting (&) emitted without PostCSS transform.
 
 ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
@@ -115,6 +119,8 @@ ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
    │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                                     │
    ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────┤
    │   E1  │ structuredClone()             │ api         │ ~5 mins     │ Inline structuredClone shim (<100B) in polyfills entry │
+   │   E1  │ -webkit-backdrop-filter       │ safari-quirk│ ~5 mins     │ Add -webkit-backdrop-filter alongside backdrop-filter  │
+   │   E1  │ 100vh viewport unit           │ safari-quirk│ ~5 mins     │ Graceful degradation: height: 100vh; @supports (100dvh)│
    │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in postcss.config.js             │
    └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────┘
 ```
@@ -143,10 +149,11 @@ Detected issues are categorized into four effort tiers based on implementation r
 - Avoids ad-hoc shell commands to minimize execution latency and permission prompts.
 
 ### 2. `/compat-optimize` (Interactive)
+- **Graceful Degradation First**: Prioritizes non-destructive progressive enhancement (`@supports`, double declaration fallbacks, WebKit vendor prefixes, capability guards) rather than removing or destructively downgrading modern CSS/JS.
 - **Context-Aware**: Directly reuses findings from recent audits in the conversation without redundant re-builds.
 - **Zero Repository Pollution**: Enforces inline, audited shims in `src/polyfills.ts` without executing `npm install` or `pnpm add`.
 - **Single-Turn Proposal**: Drafts the complete patch and entry point wiring (`import './polyfills'`) in a single step for review.
-- **Automated Validation**: Re-audits post-build to verify gap elimination and audience gain.
+- **Complete Verification Matrix**: Re-audits post-build and produces an exhaustive before/after browser matrix across all Desktop and Mobile engines, quantifying closed gaps and audience gains.
 
 ---
 

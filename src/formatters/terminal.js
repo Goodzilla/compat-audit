@@ -27,14 +27,16 @@ export function formatTerminalReport(report) {
   const summary = report.browserSummary || [];
   for (const item of summary) {
     const statusIcon = item.status === 'gap' ? pc.yellow('⚠') : pc.green('✔');
-    const bName = pc.bold(item.browser.padEnd(15));
+    const isMobile = item.platform === 'mobile' || item.key === 'ios_saf' || item.key === 'chrome_android' || item.key === 'samsung';
+    const platformBadge = isMobile ? pc.magenta('[Mobile] ') : pc.blue('[Desk]   ');
+    const bName = pc.bold(item.browser.padEnd(16));
     const target = pc.dim(`(target: ${item.declaredTarget})`.padEnd(20));
     const minVer = pc.cyan(`min: ${item.minVersion}+`.padEnd(12));
     const note = item.status === 'gap'
       ? pc.yellow(`Gap: -${item.gap} vers`)
       : pc.dim(item.headroom > 0 ? `+${item.headroom} vers headroom` : 'aligned');
 
-    lines.push(`   ${statusIcon} ${bName} ${target} ${minVer} ${note}`);
+    lines.push(`   ${statusIcon} ${platformBadge}${bName} ${target} ${minVer} ${note}`);
   }
   lines.push('');
 

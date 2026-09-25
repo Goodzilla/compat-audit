@@ -5,29 +5,30 @@ import caniuse from 'caniuse-lite';
  * Standard key browsers monitored for compatibility floor
  */
 export const TARGET_BROWSERS = [
-  { key: 'chrome', name: 'Chrome', mdnKey: 'chrome', caniuseKey: 'chrome' },
-  { key: 'safari', name: 'Safari', mdnKey: 'safari', caniuseKey: 'safari' },
-  { key: 'firefox', name: 'Firefox', mdnKey: 'firefox', caniuseKey: 'firefox' },
-  { key: 'edge', name: 'Edge', mdnKey: 'edge', caniuseKey: 'edge' },
-  { key: 'ios_saf', name: 'iOS Safari', mdnKey: 'safari_ios', caniuseKey: 'ios_saf' },
-  { key: 'chrome_android', name: 'Chrome Android', mdnKey: 'chrome_android', caniuseKey: 'and_chr' }
+  { key: 'chrome', name: 'Chrome', platform: 'desktop', mdnKey: 'chrome', caniuseKey: 'chrome' },
+  { key: 'safari', name: 'Safari', platform: 'desktop', mdnKey: 'safari', caniuseKey: 'safari' },
+  { key: 'firefox', name: 'Firefox', platform: 'desktop', mdnKey: 'firefox', caniuseKey: 'firefox' },
+  { key: 'edge', name: 'Edge', platform: 'desktop', mdnKey: 'edge', caniuseKey: 'edge' },
+  { key: 'ios_saf', name: 'iOS Safari', platform: 'mobile', mdnKey: 'safari_ios', caniuseKey: 'ios_saf' },
+  { key: 'chrome_android', name: 'Chrome Android', platform: 'mobile', mdnKey: 'chrome_android', caniuseKey: 'and_chr' },
+  { key: 'samsung', name: 'Samsung Internet', platform: 'mobile', mdnKey: 'samsunginternet_android', caniuseKey: 'samsung' }
 ];
 
 /**
  * Baseline standard floor maps for common ECMAScript & bundler targets
  */
 export const BASELINE_STANDARDS = {
-  es5: { chrome: 4, safari: 5, firefox: 4, edge: 12, ios_saf: 4.2, chrome_android: 18 },
-  es2015: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51 },
-  es6: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51 },
-  es2016: { chrome: 52, safari: 10.1, firefox: 54, edge: 15, ios_saf: 10.3, chrome_android: 52 },
-  es2017: { chrome: 58, safari: 11, firefox: 54, edge: 15, ios_saf: 11, chrome_android: 58 },
-  es2018: { chrome: 64, safari: 11.1, firefox: 58, edge: 79, ios_saf: 11.3, chrome_android: 64 },
-  es2019: { chrome: 73, safari: 12.1, firefox: 66, edge: 79, ios_saf: 12.2, chrome_android: 73 },
-  es2020: { chrome: 80, safari: 13.1, firefox: 78, edge: 80, ios_saf: 13.4, chrome_android: 80 },
-  es2021: { chrome: 85, safari: 14.1, firefox: 85, edge: 85, ios_saf: 14.5, chrome_android: 85 },
-  es2022: { chrome: 94, safari: 15.4, firefox: 93, edge: 94, ios_saf: 15.4, chrome_android: 94 },
-  es2023: { chrome: 110, safari: 16.4, firefox: 115, edge: 110, ios_saf: 16.4, chrome_android: 110 }
+  es5: { chrome: 4, safari: 5, firefox: 4, edge: 12, ios_saf: 4.2, chrome_android: 18, samsung: 4.0 },
+  es2015: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51, samsung: 5.0 },
+  es6: { chrome: 51, safari: 10, firefox: 54, edge: 15, ios_saf: 10, chrome_android: 51, samsung: 5.0 },
+  es2016: { chrome: 52, safari: 10.1, firefox: 54, edge: 15, ios_saf: 10.3, chrome_android: 52, samsung: 6.0 },
+  es2017: { chrome: 58, safari: 11, firefox: 54, edge: 15, ios_saf: 11, chrome_android: 58, samsung: 7.0 },
+  es2018: { chrome: 64, safari: 11.1, firefox: 58, edge: 79, ios_saf: 11.3, chrome_android: 64, samsung: 9.0 },
+  es2019: { chrome: 73, safari: 12.1, firefox: 66, edge: 79, ios_saf: 12.2, chrome_android: 73, samsung: 11.1 },
+  es2020: { chrome: 80, safari: 13.1, firefox: 78, edge: 80, ios_saf: 13.4, chrome_android: 80, samsung: 13.0 },
+  es2021: { chrome: 85, safari: 14.1, firefox: 85, edge: 85, ios_saf: 14.5, chrome_android: 85, samsung: 14.0 },
+  es2022: { chrome: 94, safari: 15.4, firefox: 93, edge: 94, ios_saf: 15.4, chrome_android: 94, samsung: 17.0 },
+  es2023: { chrome: 110, safari: 16.4, firefox: 115, edge: 110, ios_saf: 16.4, chrome_android: 110, samsung: 21.0 }
 };
 
 /**

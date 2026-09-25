@@ -168,6 +168,50 @@ export const REMEDIATION_CATALOG = {
     costKb: 0
   },
 
+  // --- Safari & WebKit Visual Quirks ---
+  'safari.css.backdrop-filter-prefix': {
+    effort: 1,
+    fix: 'Add -webkit-backdrop-filter alongside backdrop-filter (Safari < 18 requirement)',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.100vh-viewport': {
+    effort: 1,
+    fix: 'Use graceful degradation: height: 100vh; @supports (height: 100dvh) { height: 100dvh; }',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.aspect-ratio-flex': {
+    effort: 1,
+    fix: 'Add min-width: 0 (or min-height: 0) to flex items with aspect-ratio to prevent WebKit blowout',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.sticky-overflow-trap': {
+    effort: 2,
+    fix: 'Avoid overflow: hidden/auto/scroll on ancestors of position: sticky elements in WebKit',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.line-clamp-prefix': {
+    effort: 1,
+    fix: 'Add display: -webkit-box; -webkit-line-clamp: N; -webkit-box-orient: vertical; alongside line-clamp',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.appearance-none': {
+    effort: 1,
+    fix: 'Add -webkit-appearance: none; appearance: none; to disable native iOS form styling',
+    pkg: null,
+    costKb: 0
+  },
+  'safari.css.text-size-adjust': {
+    effort: 1,
+    fix: 'Add -webkit-text-size-adjust: 100%; text-size-adjust: 100%; to html/:root',
+    pkg: null,
+    costKb: 0
+  },
+
   // --- Effort 3 : Moderate Polyfills (5-20KB) ---
   'api.ResizeObserver': {
     effort: 3,

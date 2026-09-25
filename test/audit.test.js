@@ -12,10 +12,12 @@ describe('Baseline standards & target resolution tests', () => {
     assert.equal(es2015.safari, 10);
     assert.equal(es2015.firefox, 54);
     assert.equal(es2015.edge, 15);
+    assert.equal(es2015.samsung, 5.0);
 
     const es2020 = getBaselineSupport('es2020');
     assert.equal(es2020.chrome, 80);
     assert.equal(es2020.safari, 13.1);
+    assert.equal(es2020.samsung, 13.0);
 
     const modules = getBaselineSupport('modules');
     assert.equal(modules.chrome, 80);
@@ -63,6 +65,7 @@ describe('Report formatters and English terminology', () => {
       {
         key: 'safari',
         browser: 'Safari',
+        platform: 'desktop',
         declaredTarget: 'ES2015',
         targetVersion: 14,
         minVersion: 10,
@@ -70,6 +73,32 @@ describe('Report formatters and English terminology', () => {
         status: 'compliant',
         statusLabel: '✅ Compliant (+4 versions headroom, down to v10+)',
         headroom: 4,
+        gap: 0
+      },
+      {
+        key: 'ios_saf',
+        browser: 'iOS Safari',
+        platform: 'mobile',
+        declaredTarget: 'ES2015',
+        targetVersion: 14,
+        minVersion: 10,
+        minVersionStr: 'iOS Safari 10+',
+        status: 'compliant',
+        statusLabel: '✅ Compliant (+4 versions headroom, down to v10+)',
+        headroom: 4,
+        gap: 0
+      },
+      {
+        key: 'samsung',
+        browser: 'Samsung Internet',
+        platform: 'mobile',
+        declaredTarget: 'ES2015',
+        targetVersion: 10,
+        minVersion: 5.0,
+        minVersionStr: 'Samsung Internet 5.0+',
+        status: 'compliant',
+        statusLabel: '✅ Compliant (+5 versions headroom, down to v5.0+)',
+        headroom: 5,
         gap: 0
       }
     ],
@@ -86,6 +115,9 @@ describe('Report formatters and English terminology', () => {
     assert.ok(md.includes('Status & Headroom'));
     assert.ok(md.includes('Verdict: COMPLIANT'));
     assert.ok(md.includes('+39 versions headroom'));
+    assert.ok(md.includes('Platform'), 'Markdown table must include Platform column');
+    assert.ok(md.includes('Mobile'), 'Markdown table must show Mobile rows');
+    assert.ok(md.includes('Desktop'), 'Markdown table must show Desktop rows');
     assert.ok(!md.includes('Chrome all'), 'Must not contain "Chrome all"');
   });
 
@@ -94,6 +126,8 @@ describe('Report formatters and English terminology', () => {
     assert.ok(term.includes('COMPLIANT'));
     assert.ok(term.includes('BROWSER COMPATIBILITY SUMMARY'));
     assert.ok(term.includes('+39 vers headroom'));
+    assert.ok(term.includes('[Mobile]'), 'Terminal report must show [Mobile] badge');
+    assert.ok(term.includes('[Desk]'), 'Terminal report must show [Desk] badge');
     assert.ok(!term.includes('Chrome all'), 'Must not contain "Chrome all"');
   });
 });

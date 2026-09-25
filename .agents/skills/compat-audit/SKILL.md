@@ -43,11 +43,15 @@ Present results strictly following this 4-section adaptive structure using sober
 
 #### 2. Browser Compatibility Summary
 Render the markdown table:
-| Environment | Declared Target | Minimum Supported Version | Status & Headroom |
-|---|---|---|---|
-| Chrome / Chromium | `ES2015` | `Chrome 51+` | ✅ Compliant (+39 versions headroom, down to v51+) |
-| Safari / WebKit | `ES2015` | `Safari 10+` | ✅ Compliant (+4 versions headroom, down to v10+) |
-| Firefox / Gecko | `ES2015` | `Firefox 54+` | ✅ Compliant (Supported down to v54+) |
+| Platform | Environment | Declared Target | Minimum Supported Version | Status & Headroom |
+|---|---|---|---|---|
+| Desktop | Chrome / Chromium | `ES2015` | `Chrome 51+` | ✅ Compliant (+39 versions headroom, down to v51+) |
+| Desktop | Safari / WebKit | `ES2015` | `Safari 10+` | ✅ Compliant (+4 versions headroom, down to v10+) |
+| Desktop | Firefox / Gecko | `ES2015` | `Firefox 54+` | ✅ Compliant (Supported down to v54+) |
+| Desktop | Edge | `ES2015` | `Edge 15+` | ✅ Compliant (Supported down to v15+) |
+| Mobile | iOS Safari | `ES2015` | `iOS 10+` | ✅ Compliant (+4 versions headroom, down to v10+) |
+| Mobile | Chrome Android | `ES2015` | `Chrome 51+` | ✅ Compliant (+39 versions headroom, down to v51+) |
+| Mobile | Samsung Internet | `ES2015` | `Samsung 5.0+` | ✅ Compliant (Supported down to v5.0+) |
 
 *Never output `all` (e.g. `Chrome all`); always report the concrete minimum supported version supporting the detected baseline.*
 
@@ -55,6 +59,7 @@ Render the markdown table:
 - **Source Attribution**: Distinguish whether modern syntax/APIs originate from application code vs 3rd-party vendor dependencies (`origin: 'vendor'`).
 - **Monorepo / Shared Package Leakage**: Internal libraries leaking untranspiled syntax (`?.`, `??`, private fields) or native CSS nesting.
 - **Runtime Web APIs without polyfills**: APIs like `structuredClone`, `ResizeObserver`, or `Array.prototype.at`.
+- **Safari & WebKit Visual Quirks**: Missing `-webkit-backdrop-filter`, `100vh` viewport clipping on iOS Safari, flexbox `aspect-ratio` layout blowout, sticky clip traps, un-prefixed line-clamp or form controls.
 
 #### 4. Actionable Remediation Plan
 - **When Compliant**: Keep concise: *"No remediation required. Bundle meets or exceeds all declared targets."*

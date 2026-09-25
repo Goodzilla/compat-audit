@@ -180,6 +180,7 @@ export async function auditBundle(options = {}) {
     return {
       key: b.key,
       browser: b.name,
+      platform: b.platform || 'desktop',
       declaredTarget: declared.label,
       targetVersion: targetVer,
       minVersion: minVer,

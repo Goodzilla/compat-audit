@@ -24,8 +24,8 @@ export function formatMarkdownReport(report) {
 
   // 2. Browser Compatibility Summary
   lines.push('### 2. Browser Compatibility Summary');
-  lines.push('| Environment | Declared Target | Minimum Supported Version | Status & Headroom |');
-  lines.push('|---|---|---|---|');
+  lines.push('| Platform | Environment | Declared Target | Minimum Supported Version | Status & Headroom |');
+  lines.push('|---|---|---|---|---|');
 
   const summary = report.browserSummary || [];
   for (const item of summary) {
@@ -34,7 +34,11 @@ export function formatMarkdownReport(report) {
       : item.browser === 'Firefox' ? 'Firefox / Gecko'
       : item.browser;
 
-    lines.push(`| **${envLabel}** | \`${item.declaredTarget}\` | \`${item.minVersionStr}\` | ${item.statusLabel} |`);
+    const platformLabel = (item.platform === 'mobile' || item.key === 'ios_saf' || item.key === 'chrome_android' || item.key === 'samsung')
+      ? 'Mobile'
+      : 'Desktop';
+
+    lines.push(`| ${platformLabel} | **${envLabel}** | \`${item.declaredTarget}\` | \`${item.minVersionStr}\` | ${item.statusLabel} |`);
   }
   lines.push('');
 
