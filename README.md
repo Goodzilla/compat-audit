@@ -1,75 +1,90 @@
 # compat-audit
 
-Scan compiled frontend bundles to determine minimum browser versions and identify fixes for older browser support.
+> **AI Agent Skills Scaffolder & Browser Compatibility Engine for Production Bundles.**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+[![npm version](https://img.shields.io/npm/v/compat-audit.svg)](https://www.npmjs.com/package/compat-audit)
 
-## Background
+Most compatibility tools run during static linting on raw source files. While useful, static linting misses what actually reaches users in production: bundlers transpile syntax but do not polyfill runtime Web APIs (`structuredClone`, `crypto.randomUUID`, `ResizeObserver`), third-party packages in `node_modules` inject unconfigured modern CSS (`&` nesting, `oklch`), and internal monorepo libraries leak untranspiled syntax.
 
-Most compatibility tools run during linting on source files. While useful, static linting misses what actually reaches the browser:
+`compat-audit` is designed as a dual-purpose toolkit:
+1. **AI Agent Skills Scaffolder**: Deploys native skills to empower AI coding agents (Google Antigravity, Claude Code, Cursor) to autonomously audit and interactively fix compatibility drift.
+2. **Deterministic CLI & CI/CD Engine**: Fast, zero-config AST scanner backed by MDN Browser Compat Data and Can I Use statistics.
 
-1. Bundlers transpile syntax (such as optional chaining or class fields) to an older ECMAScript target, but do not polyfill runtime Web APIs (such as `structuredClone`, `crypto.randomUUID`, or `ResizeObserver`).
-2. Dependencies from `node_modules` can introduce newer APIs or modern CSS rules that bypass project linting rules.
-3. Lint errors treat a missing 100-byte polyfill and a missing layout engine feature with the same severity, without indicating how much effort is needed to restore compatibility.
+---
 
-`compat-audit` inspects production output files (JavaScript, CSS, and HTML) using AST parsers, cross-references findings against MDN Browser Compat Data and Can I Use statistics, and estimates the real minimum browser versions required by your build.
+## Instant Setup: Scaffold AI Agent Skills
 
-## How it works
-
-1. **Asset Discovery**: Locates the build output folder (`dist`, `.svelte-kit/output/client`, `.next/static`, `build`, or a custom path).
-2. **AST Analysis**:
-   - JavaScript: Uses Acorn to scan for ECMAScript syntax versions, global Web APIs, and prototype method usage.
-   - CSS: Uses CSSTree to scan for selectors (`:has()`, `:is()`), at-rules (`@container`, `@layer`), and modern color functions (`color-mix`, `oklch`).
-   - HTML: Uses htmlparser2 to scan for modern elements and attributes.
-3. **Configuration vs Bundle Verification**: Compares detected bundler settings (such as target in Vite or PostCSS configuration) against features actually emitted in the compiled bundles.
-4. **Effort Tiers**: Groups issues by remediation difficulty to distinguish trivial polyfills from deeper architectural constraints.
-
-## Effort Tiers
-
-Issues are categorized into four levels:
-
-- **E1 (Trivial polyfill, around 5 minutes)**: Lightweight runtime polyfill with minimal size overhead (`Array.prototype.at`, `structuredClone`, `Object.hasOwn`).
-- **E2 (Configuration change, around 15 minutes)**: Bundler target adjustments or PostCSS plugins (syntax downleveling, CSS nesting transforms, color fallbacks).
-- **E3 (Moderate polyfill, around 45 minutes)**: Larger polyfills with potential runtime or bundle size trade-offs (`ResizeObserver`, `IntersectionObserver`).
-- **E4 (Architectural refactor)**: Features that lack lightweight polyfills and require layout or architectural alternatives (such as dynamic `:has()` or `@container`).
-
-## Installation
-
-Run directly with npx:
+Add native compatibility skills to your repository with a single command:
 
 ```bash
-npx compat-audit
+npx compat-audit --init-skills
 ```
 
-Or install as a development dependency:
+*(Or install machine-wide across all your projects: `npx compat-audit --init-skills --global`)*
+
+This scaffolds two production-ready skills into `.agents/skills/`:
+
+| Skill | Mode | Role |
+|---|---|---|
+| **`/compat-audit`** | Autonomous (Model-invocable) | Scans production bundles, calculates minimum browser support floors across Chrome, Safari, Firefox, and Edge, detects *Target vs Reality* drift, and traces internal library syntax leaks. |
+| **`/compat-optimize`** | Interactive (`disable-model-invocation: true`) | Guided interactive workflow: verifies Git safety, aligns with your target baseline (e.g. *Baseline Widely Available ~98%*), drafts modular micro-polyfills (`src/polyfills.ts`), applies bundler transforms, and validates improvements before/after. |
+
+### How Agents Use These Skills
+
+- **Autonomous Auditing**: Whenever you build or ask *"What is our browser compatibility floor?"*, your agent triggers `/compat-audit`, parses the bundle ASTs in memory, and gives you a structured floor matrix and ROI quick-wins.
+- **One-Command Remediation**: Type `/compat-optimize` in your agent chat. The agent checks Git status, presents exact code diffs before touching files, adds lightweight tree-shakable shims, updates bundler configs, rebuilds, and executes tests with rollback protection.
+
+---
+
+## CLI and CI/CD Usage
+
+`compat-audit` can also be run directly from terminal sessions, GitHub Actions, or pre-commit hooks:
 
 ```bash
-npm install --save-dev compat-audit
-npx compat-audit dist/
-```
-
-## CLI Usage
-
-```bash
-compat-audit [directory] [options]
+npx compat-audit [dir] [options]
 ```
 
 ### Options
 
 | Flag | Description | Default |
 |---|---|---|
-| `[dir]` | Target directory with compiled assets | Auto-detected |
-| `--format <type>` | Output format: `terminal`, `json`, `markdown` | `terminal` |
+| `[dir]` | Target build directory (`dist`, `.output/public`, etc.) | Auto-detected |
+| `init`, `--init-skills` | Scaffold AI agent skills into `.agents/skills/` | |
+| `--global`, `-g` | Install skills globally to `~/.gemini/config/skills/` (with `init`) | `false` |
+| `--format <type>` | Output format: `terminal` (default), `json`, `markdown` | `terminal` |
 | `--json` | Shorthand for `--format json` | |
 | `--markdown`, `--md` | Shorthand for `--format markdown` | |
-| `--fail-on-incompatible` | Exit with status code 1 if issues exist | `false` |
+| `--fail-on-incompatible` | Exit with code 1 if compatibility issues exist (CI gate) | `false` |
 | `-h`, `--help` | Show help screen | |
 | `-v`, `--version` | Show version | |
 
+### CI / PR Verification Example
+
+Add `compat-audit` to your pull request workflow:
+
+```bash
+# Fail CI if production bundle breaks target compatibility
+npx compat-audit dist/ --fail-on-incompatible --markdown >> $GITHUB_STEP_SUMMARY
+```
+
+---
+
+## Effort Taxonomy (ROI Scoring)
+
+Issues detected in bundles are categorized into four deterministic effort tiers:
+
+- **E1 (Lightweight Runtime Polyfill, ~5 mins)**: Trivial micro-shims (< 1.5 KB total) with zero architectural impact (`structuredClone`, `Array.prototype.at`, `Object.hasOwn`, `crypto.randomUUID`).
+- **E2 (Configuration Change, ~15 mins)**: Bundler target adjustments or PostCSS plugins (syntax downleveling, `postcss-nested`, color fallbacks).
+- **E3 (Moderate Polyfill, ~45 mins)**: Heavier shims with runtime trade-offs (`ResizeObserver`, `IntersectionObserver`).
+- **E4 (Architectural Refactor)**: Structural layout engine features lacking clean polyfills (dynamic `:has()`, `@container`).
+
+---
+
 ## Example Output
 
-### CLI Terminal Output (`default`)
+### Terminal Report (`default`)
 
 ```
 ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -106,61 +121,29 @@ ARCHITECTURAL CONSTRAINTS (Effort 3 & 4 - Requires Architectural Choice):
 Run with --format json or --format markdown for CI/CD or PR integrations.
 ```
 
-<details>
-<summary><b>View CI / PR Markdown Report Format (<code>--markdown</code>)</b></summary>
-
-```markdown
-## Browser Compatibility Audit Report
-
-- **Scanned Directory:** `dist/`
-- **Total Files Scanned:** 38 (24 JS, 11 CSS, 3 HTML)
-- **Estimated Global Coverage:** **95.1%**
-
-### Effective Browser Floor
-| Browser | Minimum Version Required |
-|---|---|
-| **Chrome** | `105+` |
-| **Safari** | `15.4+` |
-| **Firefox** | `105+` |
-| **Edge** | `105+` |
-| **iOS Safari** | `15.4+` |
-| **Chrome Android** | `105+` |
-
-### Configuration & Bundle Diagnostics
-> [!WARNING] **Syntax vs Runtime Gap**: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (structuredClone, ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
-> [!WARNING] **CSS Nesting without fallback**: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
-
-### Actionable Remediations (Polyfills & Configuration)
-| Effort Level | Feature | Category | Est. Time | Recommended Action |
-|---|---|---|---|---|
-| **E1** (Trivial Polyfill) | `structuredClone()` | api | ~5 mins | Import @ungap/structured-clone (1.2KB) in entry |
-| **E1** (Trivial Polyfill) | `Array.prototype.at()` | prototype | ~5 mins | Add tiny Array.prototype.at polyfill in entry |
-| **E1** (Trivial Polyfill) | `Object.hasOwn()` | builtin | ~5 mins | Add tiny Object.hasOwn polyfill in entry |
-| **E2** (Configuration) | `Native CSS Nesting (&)` | selector | ~15 mins | Enable postcss-nested in postcss.config.js |
-| **E2** (Configuration) | `OKLCH Colors` | css | ~15 mins | Add @csstools/postcss-oklab-function in PostCSS |
-
-### Architectural Constraints (Effort 3 & 4)
-- **ResizeObserver** (`api.ResizeObserver`): Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.
-- **:has() selector** (`css.selectors.has`): Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.
-```
-
-</details>
+---
 
 ## Programmatic API
 
-You can also run the audit programmatically from Node.js scripts or build tools:
+You can also run audits programmatically in Node.js scripts or custom build pipelines:
 
 ```javascript
-import { auditBundle } from 'compat-audit';
+import { auditBundle, initSkills } from 'compat-audit';
 
+// 1. Audit compiled assets
 const report = await auditBundle({
   dir: 'dist',
   cwd: process.cwd()
 });
 
 console.log(report.browserFloor);
-// { chrome: 120, safari: 17.2, firefox: 121, ... }
+// { chrome: 105, safari: 15.4, firefox: 105, edge: 105, ... }
+
+// 2. Scaffold skills programmatically
+initSkills({ cwd: process.cwd() });
 ```
+
+---
 
 ## Contributing
 

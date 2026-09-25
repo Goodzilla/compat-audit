@@ -7,8 +7,9 @@ import { HtmlScanner } from './scanners/html.js';
 import { detectOutputDir, findAssetFiles } from './adapters/output-detector.js';
 import { inspectProjectConfig, compareIntentVsReality } from './adapters/bundlers.js';
 import { scoreIssue } from './scoring/effort.js';
+import { initSkills } from './commands/init.js';
 
-export { CompatDatabase, TARGET_BROWSERS };
+export { CompatDatabase, TARGET_BROWSERS, initSkills };
 
 /**
  * Run comprehensive compatibility audit on a directory or auto-detected build output

@@ -1,8 +1,11 @@
 {
   "name": "compat-audit",
   "version": "1.1.1",
-  "description": "Zero-config production bundle browser compatibility auditor & quick-win optimizer",
+  "description": "AI Agent skills scaffolder & zero-config browser compatibility engine for production bundles",
   "keywords": [
+    "ai-agent",
+    "agent-skills",
+    "antigravity",
     "browser-compatibility",
     "bundle",
     "audit",
@@ -30,6 +33,7 @@
   "files": [
     "bin",
     "src",
+    ".agents",
     "LICENSE",
     "README.md"
   ],

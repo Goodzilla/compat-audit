@@ -47,6 +47,6 @@ Present proposed diffs before applying:
 
 ### 5. Validate Improvement (Before vs After)
 Re-run `npx compat-audit dist/ --json` and display:
-- **Browser Floor Delta**: Before vs After (e.g., *Safari 15.4+ ➔ Safari 14.1+*).
+- **Browser Floor Delta**: Before vs After (e.g., *Safari 15.4+ -> Safari 14.1+*).
 - **Audience Reach Gain**: Global coverage delta (e.g., *+3.4%*).
 - **Bundle Weight Delta**: Added size overhead (e.g., *+0.9 KB gzip*).
