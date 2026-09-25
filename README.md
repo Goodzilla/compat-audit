@@ -69,40 +69,6 @@ compat-audit [directory] [options]
 
 ## Example Output
 
-### Monorepo & Multi-Target Analysis Case
-
-In real projects and monorepos, compatibility issues rarely stem from application code alone. They often leak from internal design systems or shared packages (`packages/ui`) that distribute untranspiled syntax or modern CSS directly into production:
-
-```
-================================================================================
-                    COMPAT-AUDIT BUNDLE ANALYSIS REPORT                         
-================================================================================
-
-Target: apps/web (Application SPA) + packages/ui (Design System)
-Scanned Assets: 48 files (32 JS, 13 CSS, 3 HTML)
-Estimated Global Coverage: 95.2% of web audience
-
-EFFECTIVE BROWSER FLOOR:
-   Chrome 120+  |  Safari 17.2+  |  Firefox 121+  |  Edge 120+  |  iOS Safari 17.2+
-
-ROOT CAUSE ANALYSIS:
-
-1. Untranspiled Syntax Leaks (from packages/ui):
-   ! packages/ui distributes modern JS with optional chaining (?.) and nullish
-     coalescing (??) directly into dist/.
-   -> Impact: Hard floor at Chrome 80+, Safari 13.1+, Firefox 74+.
-   -> Action: Ensure packages/ui build pipeline targets ES2018 or downlevels syntax.
-
-2. Native CSS Nesting without Fallback:
-   ! Relaxed CSS nesting (&) detected in compiled component styles.
-   -> Impact: Imposes Safari 17.2+ / Chrome 120+ for type selector nesting.
-   -> Action: Add postcss-nested or @csstools/postcss-nesting in postcss.config.js.
-
-3. Runtime Web APIs & Modern Selectors:
-   ! structuredClone() used in state serialization (blocks Safari < 15.4).
-   ! :has() selector used in card layouts (blocks Firefox < 121).
-```
-
 ### CLI Terminal Output (`default`)
 
 ```
