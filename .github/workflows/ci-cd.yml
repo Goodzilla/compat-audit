@@ -58,17 +58,17 @@ jobs:
         id: bump
         run: node scripts/bump-version.js
 
-      - name: Publish to npm
-        run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
       - name: Commit version bump to repository
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "chore(release): bump version to ${{ steps.bump.outputs.version }} [skip ci]" || echo "No changes to commit"
           git push origin main
+
+      - name: Publish to npm
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release & Changelog
         uses: softprops/action-gh-release@v2
