@@ -115,22 +115,19 @@ export class CompatDatabase {
     this.indexedPrototypeMethods = new Map();
 
     for (const [builtinName, builtinObj] of Object.entries(this.bcd.javascript?.builtins || {})) {
-      const globalObj = globalThis[builtinName];
-      if (!globalObj) continue;
       for (const [prop, val] of Object.entries(builtinObj)) {
-        if (prop.startsWith('__') || !val.__compat) continue;
+        if (prop.startsWith('__') || prop.startsWith('@@') || !val?.__compat) continue;
         if (isModern(val.__compat)) {
           const support = this.getSupportMatrix(val.__compat);
-          if (prop in globalObj) {
-            this.indexedStaticMethods.set(builtinName + '.' + prop, {
-              featureKey: 'javascript.builtins.' + builtinName + '.' + prop,
-              name: builtinName + '.' + prop + '()',
-              category: 'builtin',
-              compat: val.__compat,
-              support
-            });
-          }
-          if (globalObj.prototype && prop in globalObj.prototype) {
+          const specs = Array.isArray(val.__compat.spec_url)
+            ? val.__compat.spec_url
+            : (val.__compat.spec_url ? [val.__compat.spec_url] : []);
+          const mdnUrl = val.__compat.mdn_url || '';
+
+          const isProto = specs.some(s => typeof s === 'string' && s.toLowerCase().includes('.prototype.')) ||
+            mdnUrl.toLowerCase().includes('/prototype/');
+
+          if (isProto) {
             if (!this.indexedPrototypeMethods.has(prop)) {
               this.indexedPrototypeMethods.set(prop, {
                 featureKey: 'javascript.builtins.' + builtinName + '.' + prop,
@@ -143,6 +140,14 @@ export class CompatDatabase {
             } else {
               this.indexedPrototypeMethods.get(prop).builtins.push(builtinName);
             }
+          } else {
+            this.indexedStaticMethods.set(builtinName + '.' + prop, {
+              featureKey: 'javascript.builtins.' + builtinName + '.' + prop,
+              name: builtinName + '.' + prop + '()',
+              category: 'builtin',
+              compat: val.__compat,
+              support
+            });
           }
         }
       }
