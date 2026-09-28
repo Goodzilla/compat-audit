@@ -38,7 +38,13 @@ export function formatMarkdownReport(report) {
       ? 'Mobile'
       : 'Desktop';
 
-    lines.push(`| ${platformLabel} | **${envLabel}** | \`${item.declaredTarget}\` | \`${item.minVersionStr}\` | ${item.statusLabel} |`);
+    const hasSpecificVer = item.targetVersion !== null && item.targetVersion !== undefined
+      && !String(item.declaredTarget).includes(String(item.targetVersion));
+    const targetLabel = item.targetDisplay || (hasSpecificVer
+      ? `${item.declaredTarget} ~ v${item.targetVersion}+`
+      : item.declaredTarget);
+
+    lines.push(`| ${platformLabel} | **${envLabel}** | \`${targetLabel}\` | \`${item.minVersionStr}\` | ${item.statusLabel} |`);
   }
   lines.push('');
 

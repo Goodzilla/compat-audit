@@ -169,12 +169,19 @@ export async function auditBundle(options = {}) {
       statusLabel = `✅ Compliant (Supported down to v${minVer}+)`;
     }
 
+    const hasSpecificVer = targetVer !== null && targetVer !== undefined
+      && !String(declared.label).includes(String(targetVer));
+    const targetDisplay = hasSpecificVer
+      ? `${declared.label} ~ v${targetVer}+`
+      : declared.label;
+
     return {
       key: b.key,
       browser: b.name,
       platform: b.platform || 'desktop',
       declaredTarget: declared.label,
       targetVersion: targetVer,
+      targetDisplay,
       minVersion: minVer,
       minVersionStr: `${b.name} ${minVer}+`,
       status,

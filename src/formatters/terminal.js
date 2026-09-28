@@ -25,12 +25,26 @@ export function formatTerminalReport(report) {
   // 2. Browser Compatibility Summary
   lines.push(pc.bold(pc.underline('BROWSER COMPATIBILITY SUMMARY:')));
   const summary = report.browserSummary || [];
-  for (const item of summary) {
+  const targetStrings = summary.map(item => {
+    if (item.targetDisplay) return item.targetDisplay;
+    const hasSpecificVer = item.targetVersion !== null && item.targetVersion !== undefined
+      && !String(item.declaredTarget).includes(String(item.targetVersion));
+    return hasSpecificVer
+      ? `${item.declaredTarget} ~ v${item.targetVersion}+`
+      : item.declaredTarget;
+  });
+  const maxTargetLen = targetStrings.length > 0
+    ? Math.max(20, ...targetStrings.map(s => `(target: ${s})`.length))
+    : 20;
+
+  for (let i = 0; i < summary.length; i++) {
+    const item = summary[i];
+    const targetLabel = targetStrings[i];
     const statusIcon = item.status === 'gap' ? pc.yellow('⚠') : pc.green('✔');
     const isMobile = item.platform === 'mobile' || item.key === 'ios_saf' || item.key === 'chrome_android' || item.key === 'samsung';
     const platformBadge = isMobile ? pc.magenta('[Mobile] ') : pc.blue('[Desk]   ');
     const bName = pc.bold(item.browser.padEnd(16));
-    const target = pc.dim(`(target: ${item.declaredTarget})`.padEnd(20));
+    const target = pc.dim(`(target: ${targetLabel})`.padEnd(maxTargetLen + 2));
     const minVer = pc.cyan(`min: ${item.minVersion}+`.padEnd(12));
     const note = item.status === 'gap'
       ? pc.yellow(`Gap: -${item.gap} vers`)

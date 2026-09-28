@@ -119,6 +119,7 @@ describe('Report formatters and English terminology', () => {
     assert.ok(md.includes('Mobile'), 'Markdown table must show Mobile rows');
     assert.ok(md.includes('Desktop'), 'Markdown table must show Desktop rows');
     assert.ok(!md.includes('Chrome all'), 'Must not contain "Chrome all"');
+    assert.ok(md.includes('ES2015 ~ v90+'), 'Markdown report must display corresponding browser version for standard targets');
   });
 
   it('generates terminal report with English terms', () => {
@@ -129,6 +130,30 @@ describe('Report formatters and English terminology', () => {
     assert.ok(term.includes('[Mobile]'), 'Terminal report must show [Mobile] badge');
     assert.ok(term.includes('[Desk]'), 'Terminal report must show [Desk] badge');
     assert.ok(!term.includes('Chrome all'), 'Must not contain "Chrome all"');
+    assert.ok(term.includes('target: ES2015 ~ v90+'), 'Terminal report must display corresponding browser version for standard targets');
+  });
+
+  it('does not duplicate version when target already specifies browser version', () => {
+    const reportWithBrowserTarget = {
+      ...mockReportCompliant,
+      browserSummary: [
+        {
+          key: 'chrome',
+          browser: 'Chrome',
+          declaredTarget: 'Chrome 90+',
+          targetVersion: 90,
+          minVersion: 51,
+          minVersionStr: 'Chrome 51+',
+          status: 'compliant',
+          statusLabel: '✅ Compliant (+39 versions headroom, down to v51+)',
+          headroom: 39,
+          gap: 0
+        }
+      ]
+    };
+    const term = formatTerminalReport(reportWithBrowserTarget);
+    assert.ok(term.includes('(target: Chrome 90+)'), 'Must preserve target without appending duplicate version');
+    assert.ok(!term.includes('Chrome 90+ ~ v90+'), 'Must not duplicate version string');
   });
 });
 
