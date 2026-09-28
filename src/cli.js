@@ -1,9 +1,15 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { auditBundle } from './index.js';
 import { formatTerminalReport } from './formatters/terminal.js';
 import { formatJsonReport } from './formatters/json.js';
 import { formatMarkdownReport } from './formatters/markdown.js';
 import { initSkills, promptScope } from './commands/init.js';
 import pc from 'picocolors';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'), 'utf-8'));
 
 export async function runCli(argv = []) {
   let dir = null;
@@ -18,7 +24,7 @@ export async function runCli(argv = []) {
       process.exit(0);
     }
     if (arg === '--version' || arg === '-v') {
-      console.log('compat-audit v1.2.0');
+      console.log(`compat-audit v${pkg.version}`);
       process.exit(0);
     }
     if (arg === 'init' || arg === 'init-skills' || arg === '--init-skills') {
@@ -58,7 +64,7 @@ export async function runCli(argv = []) {
       format = 'markdown';
     } else if (arg === '--build') {
       build = true;
-    } else if (arg === '--fail-on-incompatible') {
+    } else if (arg === '--fail-on-incompatible' || arg === '--fail-on-gap' || arg === '--ci') {
       failOnIncompatible = true;
     } else if (!arg.startsWith('-') && !dir) {
       dir = arg;
@@ -76,7 +82,7 @@ export async function runCli(argv = []) {
       console.log(formatTerminalReport(report));
     }
 
-    if (failOnIncompatible && report.quickWins.length > 0) {
+    if (failOnIncompatible && (report.hasGaps || report.quickWins.length > 0)) {
       process.exit(1);
     }
   } catch (err) {
@@ -104,7 +110,8 @@ Options:
   --format <type>       Output format: terminal (default), json, markdown
   --json                Shorthand for --format json
   --markdown, --md      Shorthand for --format markdown
-  --fail-on-incompatible Exit with code 1 if compatibility issues/quick wins are detected
+  --ci, --fail-on-gap   Exit with code 1 if compatibility gaps or quick wins are detected (CI mode)
+  --fail-on-incompatible Alias for --fail-on-gap
   -h, --help            Display this help message
   -v, --version         Display version
 `);

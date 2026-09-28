@@ -65,7 +65,7 @@ export async function auditBundle(options = {}) {
     try {
       const code = fs.readFileSync(file, 'utf-8');
       const relPath = path.relative(rootDir, file);
-      const results = jsScanner.scan(code, relPath);
+      const results = jsScanner.scan(code, relPath, file);
       for (const res of results) {
         if (!findingsMap.has(res.featureKey)) {
           findingsMap.set(res.featureKey, res);

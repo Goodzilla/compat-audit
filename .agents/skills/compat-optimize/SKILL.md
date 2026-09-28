@@ -12,9 +12,8 @@ Apply high-ROI browser compatibility remediations identified by `compat-audit` t
 1. **REUSE CONTEXT FIRST (No redundant audits)**:
    If an audit was already performed earlier in the conversation, **DO NOT run a new build or audit**. Directly reuse the existing findings, targets, and `quickWins` from the context history.
    Only run `npx compat-audit --build --json` if no audit data exists in the conversation or if the user explicitly requests a fresh re-scan.
-2. **ZERO REPO POLLUTION (NEVER run package installs)**:
-   **NEVER execute `npm install`, `pnpm add`, or `yarn add`**.
-   Never install external packages for Effort 1 micro-polyfills. External installs pollute the project tree (e.g. creating unwanted `.pnpm-store` folders) and bloat dependencies. All micro-polyfills MUST be 100% inline zero-dependency vanilla shims.
+2. **HYBRID APPROACH & ZERO REPO POLLUTION**:
+   Prioritize bundler configuration (e.g. Vite target, PostCSS plugins) first. When missing global APIs require runtime shims, use 100% inline zero-dependency vanilla shims in `src/polyfills.ts` without installing external packages. Only suggest standalone npm packages (e.g. `@ungap/structured-clone`) if complex binary types (like `Blob` or `ImageBitmap`) are specifically required.
 3. **ALWAYS ATTEMPT GRACEFUL DEGRADATION FIRST**:
    **NEVER destructively strip or replace modern features with obsolete legacy code**. Always favor progressive enhancement:
    - **CSS**: Prioritize `@supports (property: value)` and `@supports selector(...)`. Provide standard fallback declarations immediately before modern properties (e.g. solid color fallback before `color-mix()` / `oklch()`, `100vh` before `100dvh`). Add standard WebKit vendor prefixes (`-webkit-backdrop-filter`, `-webkit-appearance: none`, `-webkit-line-clamp`).
@@ -49,14 +48,15 @@ if (!Object.hasOwn) {
     Object.prototype.hasOwnProperty.call(obj, prop);
 }
 
-// 2. Array/String.prototype.at (Chrome < 92, Safari < 15.4, Firefox < 90)
+// 2. Array/String/TypedArray.prototype.at (Chrome < 92, Safari < 15.4, Firefox < 90)
 function at(this: any, n: number) {
   n = Math.trunc(n) || 0;
   if (n < 0) n += this.length;
   if (n < 0 || n >= this.length) return undefined;
   return this[n];
 }
-for (const C of [Array, String, typeof Uint8Array !== 'undefined' ? Uint8Array : null].filter(Boolean)) {
+const TypedArray = typeof Uint8Array !== 'undefined' ? Object.getPrototypeOf(Uint8Array) : null;
+for (const C of [Array, String, TypedArray].filter(Boolean)) {
   if (!C!.prototype.at) (C!.prototype as any).at = at;
 }
 
@@ -66,8 +66,7 @@ if (!Promise.allSettled) {
     Promise.all(promises.map(p =>
       Promise.resolve(p).then(
         value => ({ status: 'fulfilled', value }),
-        reason => ({ status: 'rejected', reason })
-      )
+        reason => ({ status: 'rejected', reason })\n      )
     ));
 }
 
@@ -81,9 +80,42 @@ if (typeof crypto !== 'undefined' && !crypto.randomUUID) {
 }
 
 // 5. structuredClone fallback (Chrome < 98, Safari < 15.4, Firefox < 94)
+// High-fidelity zero-dependency clone with circular ref support & standard types
 if (typeof globalThis.structuredClone !== 'function') {
   globalThis.structuredClone = function <T>(val: T): T {
-    return JSON.parse(JSON.stringify(val));
+    const seen = new WeakMap();
+    function clone(v: any): any {
+      if (v === null || typeof v !== 'object') return v;
+      if (seen.has(v)) return seen.get(v);
+      if (v instanceof Date) return new Date(v.getTime());
+      if (v instanceof RegExp) return new RegExp(v.source, v.flags);
+      if (typeof ArrayBuffer !== 'undefined' && v instanceof ArrayBuffer) return v.slice(0);
+      if (typeof ArrayBuffer !== 'undefined' && ArrayBuffer.isView(v)) {
+        return new (v.constructor as any)(v.buffer.slice(0), v.byteOffset, (v as any).length);
+      }
+      if (v instanceof Map) {
+        const m = new Map();
+        seen.set(v, m);
+        v.forEach((val, key) => m.set(clone(key), clone(val)));
+        return m;
+      }
+      if (v instanceof Set) {
+        const s = new Set();
+        seen.set(v, s);
+        v.forEach(val => s.add(clone(val)));
+        return s;
+      }
+      const out = Array.isArray(v) ? [] : Object.create(Object.getPrototypeOf(v) || null);
+      seen.set(v, out);
+      for (const k of Reflect.ownKeys(v)) {
+        const desc = Object.getOwnPropertyDescriptor(v, k);
+        if (desc && (desc.enumerable || Array.isArray(v))) {
+          out[k] = clone(v[k]);
+        }
+      }
+      return out;
+    }
+    return clone(val);
   };
 }
 

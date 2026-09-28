@@ -84,6 +84,81 @@ export class CompatDatabase {
     this.caniuse = caniuse;
     this.globalStats = this._computeGlobalStats();
     this.frStats = this._computeRegionStats('FR');
+    this._indexModernFeatures();
+  }
+
+  _indexModernFeatures() {
+    const es2015 = BASELINE_STANDARDS.es2015;
+    const isModern = (compat) => {
+      if (!compat || !compat.support) return false;
+      for (const b of TARGET_BROWSERS) {
+        const ver = getBrowserSupport(compat.support[b.mdnKey]);
+        if (ver && ver > (es2015[b.key] || 1)) return true;
+      }
+      return false;
+    };
+
+    this.indexedGlobals = new Map();
+    for (const [key, val] of Object.entries(this.bcd.api || {})) {
+      if (val.__compat && isModern(val.__compat)) {
+        this.indexedGlobals.set(key, {
+          featureKey: 'api.' + key,
+          name: key + (typeof globalThis[key] === 'function' ? '()' : ''),
+          category: 'api',
+          compat: val.__compat,
+          support: this.getSupportMatrix(val.__compat)
+        });
+      }
+    }
+
+    this.indexedStaticMethods = new Map();
+    this.indexedPrototypeMethods = new Map();
+
+    for (const [builtinName, builtinObj] of Object.entries(this.bcd.javascript?.builtins || {})) {
+      const globalObj = globalThis[builtinName];
+      if (!globalObj) continue;
+      for (const [prop, val] of Object.entries(builtinObj)) {
+        if (prop.startsWith('__') || !val.__compat) continue;
+        if (isModern(val.__compat)) {
+          const support = this.getSupportMatrix(val.__compat);
+          if (prop in globalObj) {
+            this.indexedStaticMethods.set(builtinName + '.' + prop, {
+              featureKey: 'javascript.builtins.' + builtinName + '.' + prop,
+              name: builtinName + '.' + prop + '()',
+              category: 'builtin',
+              compat: val.__compat,
+              support
+            });
+          }
+          if (globalObj.prototype && prop in globalObj.prototype) {
+            if (!this.indexedPrototypeMethods.has(prop)) {
+              this.indexedPrototypeMethods.set(prop, {
+                featureKey: 'javascript.builtins.' + builtinName + '.' + prop,
+                name: builtinName + '.prototype.' + prop + '()',
+                category: 'prototype',
+                compat: val.__compat,
+                support,
+                builtins: [builtinName]
+              });
+            } else {
+              this.indexedPrototypeMethods.get(prop).builtins.push(builtinName);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  lookupGlobal(name) {
+    return this.indexedGlobals.get(name) || null;
+  }
+
+  lookupStatic(objName, propName) {
+    return this.indexedStaticMethods.get(`${objName}.${propName}`) || null;
+  }
+
+  lookupPrototype(propName) {
+    return this.indexedPrototypeMethods.get(propName) || null;
   }
 
   _computeGlobalStats() {

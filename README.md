@@ -60,7 +60,7 @@ compat-audit [dir] [options]
 | `--format <type>` | `string` | `terminal` | Output format: `terminal`, `json`, `markdown`. |
 | `--json` | `boolean` | `false` | Shorthand for `--format json`. |
 | `--markdown`, `--md` | `boolean` | `false` | Shorthand for `--format markdown`. |
-| `--fail-on-incompatible`| `boolean` | `false` | Exit with code 1 if compatibility issues or quick wins are detected. |
+| `--ci`, `--fail-on-gap`, `--fail-on-incompatible` | `boolean` | `false` | Exit with code 1 if compatibility gaps or quick wins are detected (CI mode). |
 | `init`, `--init-skills` | command | - | Interactively install AI agent skills. |
 | `--local`, `-l` | `boolean` | `true` | Install skills to project workspace without prompting. |
 | `--global`, `-g` | `boolean` | `false` | Install skills globally to user home directories without prompting. |
@@ -73,7 +73,7 @@ Integrate into GitHub Actions to prevent compatibility regressions:
 
 ```yaml
 - name: Audit Browser Compatibility
-  run: npx compat-audit --build --fail-on-incompatible --markdown >> $GITHUB_STEP_SUMMARY
+  run: npx compat-audit --build --ci --markdown >> $GITHUB_STEP_SUMMARY
 ```
 
 ---
