@@ -35,13 +35,13 @@ npx compat-audit --build --json
 
 ### 2. Scaffold AI Agent Skills
 
-Integrate native compatibility capabilities into your development workflow across Claude Code, Google Antigravity, OpenAI Codex, Cursor, Windsurf, and GitHub Copilot:
+Install skills for AI coding assistants (Claude Code, Google Antigravity, Cursor, Windsurf, Copilot):
 
 ```bash
 npx compat-audit --init-skills
 ```
 
-Select project-level (`.agents/skills/` + bridges) or global machine-level (`~/.agents/skills/`).
+Supports project-level (`.agents/skills/`) and global (`~/.agents/skills/`) installations.
 
 ---
 
@@ -64,16 +64,7 @@ flowchart LR
 
 ---
 
-## Report Structure
-
-Audit reports are structured into four adaptive sections:
-
-1. **Executive Summary**: Clear verdict (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset inventory, global audience coverage, and compatibility gap percentage.
-2. **Browser Compatibility Summary**: Declared target versus minimum supported version, including positive safety margin (headroom).
-3. **Diagnostics & Code Findings**: Source attribution (`app` vs `vendor`), unpolyfilled global APIs, and CSS features lacking fallbacks.
-4. **Actionable Remediation Plan**: Categorized by deterministic effort tiers.
-
-### Sample Terminal Output
+## Example Output
 
 ```
 ╔═══════════════════════════════════════════════════════════════════════════╗
@@ -115,7 +106,7 @@ ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
 
 ---
 
-## Effort Taxonomy (ROI Scoring)
+## Effort Levels
 
 Detected issues are categorized into four effort tiers based on implementation risk and cost:
 
@@ -161,20 +152,10 @@ Integrate into GitHub Actions to prevent compatibility regressions:
 
 ## AI Agent Integration
 
-`compat-audit init` configures two specialized skills:
+`compat-audit init` installs agent skills for AI assistants (Claude Code, Google Antigravity, Cursor, etc.):
 
-### 1. `/compat-audit` (Autonomous)
-- Scans compiled assets with automatic fresh builds (`--build`).
-- Inspects project targets (`tsconfig.json`, `vite.config.*`, `.browserslistrc`).
-- Classifies issue origin (`app` source vs `vendor` chunk leakage).
-- Avoids ad-hoc shell commands to minimize execution latency and permission prompts.
-
-### 2. `/compat-optimize` (Interactive)
-- **Graceful Degradation First**: Prioritizes non-destructive progressive enhancement (`@supports`, double declaration fallbacks, WebKit vendor prefixes, capability guards) rather than removing modern CSS/JS.
-- **Context-Aware**: Directly reuses findings from recent audits in the conversation without redundant re-builds.
-- **Zero Repository Pollution**: Enforces inline, audited shims in `src/polyfills.ts` without executing `npm install` or `pnpm add`.
-- **Single-Turn Proposal**: Drafts the complete patch and entry point wiring (`import './polyfills'`) in a single step for review.
-- **Complete Verification Matrix**: Re-audits post-build and produces an exhaustive before/after browser matrix across all Desktop and Mobile engines, quantifying closed gaps and audience gains.
+- **`/compat-audit`**: Runs bundle audits, checks declared compiler targets, and reports compatibility gaps across browser engines.
+- **`/compat-optimize`**: Proposes targeted fixes (progressive enhancement fallbacks, inline runtime polyfills, bundler/PostCSS configuration) and verifies resolution with a post-fix audit.
 
 ---
 
