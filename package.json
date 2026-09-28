@@ -1,6 +1,6 @@
 {
   "name": "compat-audit",
-  "version": "1.9.0",
+  "version": "1.9.1",
   "description": "AI Agent skills scaffolder & zero-config browser compatibility engine for production bundles",
   "keywords": [
     "ai-agent",
