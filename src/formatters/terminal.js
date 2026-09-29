@@ -93,7 +93,7 @@ export function formatTerminalSingleReport(report, options = {}) {
     lines.push(`   ${pc.green('No immediate remediation required. Bundle meets or exceeds all declared targets.')}`);
   } else {
     lines.push(`   ┌───────┬───────────────────────────────┬─────────────┬──────────────────────────────────────────────────────────────────┐`);
-    lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Recommended Action')}                                                 │`);
+    lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Recommended Action')}                                               │`);
     lines.push(`   ├───────┼───────────────────────────────┼─────────────┼──────────────────────────────────────────────────────────────────┤`);
 
     for (const item of report.quickWins.slice(0, 8)) {
