@@ -9,8 +9,9 @@ import { detectOutputDir, findAssetFiles } from './adapters/output-detector.js';
 import { inspectProjectConfig, resolveDeclaredTargets, compareIntentVsReality } from './adapters/bundlers.js';
 import { scoreIssue } from './scoring/effort.js';
 import { initSkills } from './commands/init.js';
+import { findWorkspace, inspectWorkspaceProject } from './adapters/workspace.js';
 
-export { CompatDatabase, TARGET_BROWSERS, initSkills };
+export { CompatDatabase, TARGET_BROWSERS, initSkills, findWorkspace };
 
 /**
  * Detect package manager based on lockfiles
@@ -23,9 +24,9 @@ export function detectPackageManager(rootDir = process.cwd()) {
 }
 
 /**
- * Run comprehensive compatibility audit on a directory or auto-detected build output
+ * Run compatibility audit on a single project directory
  */
-export async function auditBundle(options = {}) {
+export async function auditSingleProject(options = {}) {
   const rootDir = options.cwd || process.cwd();
   const pm = detectPackageManager(rootDir);
 
@@ -48,7 +49,7 @@ export async function auditBundle(options = {}) {
     );
   }
 
-  const compatDb = new CompatDatabase();
+  const compatDb = new CompatDatabase({ region: options.region });
   const jsScanner = new JsScanner(compatDb);
   const cssScanner = new CssScanner(compatDb);
   const htmlScanner = new HtmlScanner(compatDb);
@@ -128,22 +129,28 @@ export async function auditBundle(options = {}) {
     browserFloor[b.key] = maxVer !== null ? maxVer : (baselineSupport[b.key] || 1);
   }
 
-  // Calculate estimated global coverage %
+  // Calculate estimated audience coverage % for the configured region
   const coverage = compatDb.calculateCoverage(browserFloor);
 
-  // Score all issues
-  const scoredIssues = allFindings.map(item =>
-    scoreIssue(item.featureKey, item.name, item.category, browserFloor, null)
-  );
+  // Score all issues and tag whether they cause gaps on declared targets
+  const scoredIssues = allFindings.map(item => {
+    const scored = scoreIssue(item.featureKey, item.name, item.category, browserFloor, null);
+    const causesGap = TARGET_BROWSERS.some(b => {
+      const declaredVer = declaredTargets.browsers[b.key]?.targetVersion;
+      const featVer = item.support ? item.support[b.key] : null;
+      return declaredVer !== null && declaredVer !== undefined && featVer !== null && featVer > declaredVer;
+    });
+    return { ...scored, causesGap };
+  });
 
   // Group into Quick Wins (Effort 1 & 2) vs Structural Blockers (Effort 3 & 4)
   const quickWins = scoredIssues
     .filter(i => i.effort <= 2)
-    .sort((a, b) => a.effort - b.effort);
+    .sort((a, b) => (b.causesGap ? 1 : 0) - (a.causesGap ? 1 : 0) || a.effort - b.effort);
 
   const structuralBlockers = scoredIssues
     .filter(i => i.effort > 2)
-    .sort((a, b) => a.effort - b.effort);
+    .sort((a, b) => (b.causesGap ? 1 : 0) - (a.causesGap ? 1 : 0) || a.effort - b.effort);
 
   const diagnostics = compareIntentVsReality(projectConfig, allFindings);
 
@@ -161,12 +168,12 @@ export async function auditBundle(options = {}) {
     if (targetVer !== null && minVer > targetVer) {
       status = 'gap';
       gap = Math.round((minVer - targetVer) * 10) / 10;
-      statusLabel = `⚠️ Compatibility Gap (Requires v${minVer}+, target v${targetVer}+)`;
+      statusLabel = `Compatibility Gap (Requires v${minVer}+, target v${targetVer}+)`;
     } else if (targetVer !== null && targetVer > minVer) {
       headroom = Math.round((targetVer - minVer) * 10) / 10;
-      statusLabel = `✅ Compliant (+${headroom} versions headroom, down to v${minVer}+)`;
+      statusLabel = `Compliant (+${headroom} versions headroom, down to v${minVer}+)`;
     } else {
-      statusLabel = `✅ Compliant (Supported down to v${minVer}+)`;
+      statusLabel = `Compliant (Supported down to v${minVer}+)`;
     }
 
     const hasSpecificVer = targetVer !== null && targetVer !== undefined
@@ -191,16 +198,21 @@ export async function auditBundle(options = {}) {
     };
   });
 
-  const hasGaps = browserSummary.some(s => s.status === 'gap') || quickWins.length > 0;
+  const hasGaps = browserSummary.some(s => s.status === 'gap');
   const verdict = hasGaps ? 'COMPATIBILITY GAP DETECTED' : 'COMPLIANT';
 
-  // Calculate target coverage and audience loss
+  // Calculate target coverage, measured coverage, and audience gap
   const targetCoverage = compatDb.calculateCoverage(
     Object.fromEntries(TARGET_BROWSERS.map(b => [b.key, declaredTargets.browsers[b.key]?.targetVersion || 1]))
   );
-  const audienceLoss = Math.max(0, Math.round((targetCoverage - coverage) * 10) / 10);
+  const measuredCoverage = coverage;
+  const audienceGap = Math.round((measuredCoverage - targetCoverage) * 10) / 10;
+  const audienceLoss = Math.max(0, Math.round((targetCoverage - measuredCoverage) * 10) / 10);
+  const regionLabel = compatDb.region === 'global' ? 'Global' : compatDb.region;
 
   return {
+    projectName: options.projectName || null,
+    projectPath: options.projectPath || null,
     targetDir: path.relative(rootDir, targetDir) || targetDir,
     totalFiles: files.length,
     totalJsFiles: jsFiles.length,
@@ -208,9 +220,14 @@ export async function auditBundle(options = {}) {
     totalHtmlFiles: htmlFiles.length,
     verdict,
     hasGaps,
+    region: compatDb.region,
+    regionLabel,
     browserFloor,
     browserSummary,
     coverage,
+    measuredCoverage,
+    targetCoverage,
+    audienceGap,
     audienceLoss,
     quickWins,
     structuralBlockers,
@@ -219,4 +236,103 @@ export async function auditBundle(options = {}) {
     declaredTargets,
     allFindings
   };
+}
+
+/**
+ * Run comprehensive compatibility audit on a directory or auto-detected workspace/project
+ */
+export async function auditBundle(options = {}) {
+  const rootDir = options.cwd || process.cwd();
+
+  // If a directory is explicitly specified, audit that single target
+  if (options.dir) {
+    return auditSingleProject(options);
+  }
+
+  // Check if current directory is a monorepo workspace
+  const ws = findWorkspace(rootDir);
+  if (ws.isWorkspace && ws.projects.length > 0) {
+    let targetProjects = ws.projects;
+
+    // Filter by specific project if requested via options.project
+    if (options.project) {
+      targetProjects = ws.projects.filter(p =>
+        p.name === options.project ||
+        p.path === options.project ||
+        p.path.endsWith(options.project) ||
+        path.basename(p.path) === options.project
+      );
+      if (targetProjects.length === 0) {
+        throw new Error(
+          `Project "${options.project}" not found in workspace (${ws.configFile}). Available projects: ${ws.projects.map(p => p.name || p.path).join(', ')}`
+        );
+      }
+    }
+
+    const pm = detectPackageManager(rootDir);
+    if (options.build) {
+      console.log(`Building workspace projects with ${pm}...`);
+      try {
+        execSync(`${pm} run build`, { cwd: rootDir, stdio: 'inherit' });
+      } catch (err) {
+        throw new Error(`Workspace build failed (${pm} run build): ${err.message}`);
+      }
+      targetProjects = targetProjects.map(p => inspectWorkspaceProject(p.fullPath, rootDir));
+    }
+
+    const projectsWithOutput = targetProjects.filter(p => p.hasOutput);
+    if (projectsWithOutput.length === 0) {
+      throw new Error(
+        `Workspace detected (${ws.configFile}) with projects [${targetProjects.map(p => p.name || p.path).join(', ')}], but no build output found. Please run your build first or pass --build.`
+      );
+    }
+
+    // Run audit for each project independently
+    const projectResults = [];
+    for (const proj of projectsWithOutput) {
+      const report = await auditSingleProject({
+        cwd: proj.fullPath,
+        dir: proj.outputDir,
+        build: false,
+        projectName: proj.name,
+        projectPath: proj.path,
+        region: options.region
+      });
+      projectResults.push({
+        name: proj.name,
+        path: proj.path,
+        fullPath: proj.fullPath,
+        outputDir: proj.outputDir,
+        report
+      });
+    }
+
+    const totalProjects = projectResults.length;
+    const gapProjects = projectResults.filter(p => p.report.hasGaps).length;
+    const compliantProjects = totalProjects - gapProjects;
+    const hasGaps = gapProjects > 0;
+    const verdict = hasGaps ? 'COMPATIBILITY GAP DETECTED' : 'COMPLIANT';
+    const firstProjectReport = projectResults[0]?.report;
+    const region = firstProjectReport?.region || options.region || 'global';
+    const regionLabel = firstProjectReport?.regionLabel || (region === 'global' ? 'Global' : region.toUpperCase());
+
+    return {
+      isMonorepo: true,
+      workspaceConfig: ws.configFile,
+      region,
+      regionLabel,
+      summary: {
+        totalProjects,
+        compliantProjects,
+        gapProjects,
+        hasGaps,
+        verdict
+      },
+      hasGaps,
+      projects: projectResults
+    };
+  }
+
+  // Fallback to single project detection
+  return auditSingleProject(options);
 }

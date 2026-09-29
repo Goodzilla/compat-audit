@@ -16,6 +16,8 @@ export async function runCli(argv = []) {
   let format = 'terminal';
   let failOnIncompatible = false;
   let build = false;
+  let project = null;
+  let region = 'global';
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -64,6 +66,10 @@ export async function runCli(argv = []) {
       format = 'markdown';
     } else if (arg === '--build') {
       build = true;
+    } else if ((arg === '--project' || arg === '-p') && argv[i + 1]) {
+      project = argv[++i];
+    } else if ((arg === '--region' || arg === '-r') && argv[i + 1]) {
+      region = argv[++i];
     } else if (arg === '--fail-on-incompatible' || arg === '--fail-on-gap' || arg === '--ci') {
       failOnIncompatible = true;
     } else if (!arg.startsWith('-') && !dir) {
@@ -72,7 +78,7 @@ export async function runCli(argv = []) {
   }
 
   try {
-    const report = await auditBundle({ dir, build });
+    const report = await auditBundle({ dir, build, project, region });
 
     if (format === 'json') {
       console.log(formatJsonReport(report));
@@ -82,7 +88,7 @@ export async function runCli(argv = []) {
       console.log(formatTerminalReport(report));
     }
 
-    if (failOnIncompatible && (report.hasGaps || report.quickWins.length > 0)) {
+    if (failOnIncompatible && report.hasGaps) {
       process.exit(1);
     }
   } catch (err) {
@@ -105,6 +111,8 @@ Arguments:
 
 Options:
   --build               Auto-build production assets using detected package manager if output is missing
+  --project, -p <name>  Audit a specific project in a monorepo workspace
+  --region, -r <code>   Audience region for market share coverage (e.g. FR, US, global; default: global)
   --local, -l           Install skills to project workspace (.agents/skills/) without prompting
   --global, -g          Install skills globally to ~/.agents/skills/ and ~/.gemini/config/skills/
   --format <type>       Output format: terminal (default), json, markdown

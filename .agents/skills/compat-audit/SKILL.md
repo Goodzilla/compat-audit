@@ -21,7 +21,7 @@ Audit compiled production assets against MDN and Can I Use data to detect browse
 1. **Inspect Intent**: Read declared targets from `package.json`, `tsconfig.json`, `vite.config.*`, or `.browserslistrc`.
 2. **Run Audit**: Execute `npx compat-audit --build --json` and parse the output JSON into memory.
 3. **Report Results**: Present a clean 4-section report using standard English engineering terms:
-   - **Executive Summary**: Verdict badge (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset counts, global coverage %, and gap %.
+   - **Executive Summary**: Verdict badge (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset counts, Target Coverage %, Measured Coverage %, and Audience Gap %.
    - **Browser Summary Table**: Columns: `Platform | Environment | Declared Target | Minimum Supported Version | Status & Headroom`. Cover Desktop (Chrome, Safari, Firefox, Edge) and Mobile (iOS Safari, Chrome Android, Samsung Internet).
    - **Diagnostics**: Detail source origin (`app` vs `vendor` packages via source maps), syntax vs runtime gaps, and WebKit visual quirks. Only render if issues exist.
    - **Remediation Plan**: Group actionable items by effort tier:

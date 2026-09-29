@@ -1,5 +1,24 @@
+import { createRequire } from 'node:module';
 import bcd from '@mdn/browser-compat-data' with { type: 'json' };
 import caniuse from 'caniuse-lite';
+
+const require = createRequire(import.meta.url);
+
+/**
+ * Universal methods and properties present on Object.prototype, standard ES5 built-ins,
+ * or common getter properties that must not be falsely flagged as modern prototype features
+ */
+export const UNIVERSAL_OR_ES5_PROPERTIES = new Set([
+  // Object.prototype & standard universal methods
+  'constructor', 'toString', 'toLocaleString', 'valueOf', 'hasOwnProperty', 'isPrototypeOf', 'propertyIsEnumerable',
+  // Standard ES5 Array & String methods
+  'slice', 'concat', 'join', 'indexOf', 'lastIndexOf', 'forEach', 'map', 'filter', 'reduce', 'reduceRight',
+  'some', 'every', 'sort', 'reverse', 'push', 'pop', 'shift', 'unshift', 'splice',
+  'split', 'substring', 'substr', 'charAt', 'charCodeAt', 'replace', 'search', 'toLowerCase', 'toUpperCase', 'trim',
+  // Common property/getter collisions that are not distinctively modern prototype methods
+  'description', 'flags', 'byteLength', 'length', 'name', 'size', 'source', 'message',
+  'register', 'unregister', 'resize', 'detached', 'values', 'entries', 'keys'
+]);
 
 /**
  * Standard key browsers monitored for compatibility floor
@@ -79,12 +98,38 @@ export function getBrowserSupport(supportItem) {
  * Pre-indexed compatibility knowledge base for fast AST lookup
  */
 export class CompatDatabase {
-  constructor() {
+  constructor(options = {}) {
     this.bcd = bcd;
     this.caniuse = caniuse;
-    this.globalStats = this._computeGlobalStats();
-    this.frStats = this._computeRegionStats('FR');
+    const requestedRegion = typeof options === 'string' ? options : options?.region;
+    this.region = this._initStats(requestedRegion);
     this._indexModernFeatures();
+  }
+
+  _initStats(region) {
+    this.stats = {};
+    if (!region || String(region).trim().toLowerCase() === 'global') {
+      for (const b of TARGET_BROWSERS) {
+        this.stats[b.key] = this.caniuse.agents[b.caniuseKey]?.usage_global || {};
+      }
+      return 'global';
+    }
+
+    const regCode = String(region).trim().toUpperCase();
+    try {
+      const regData = require(`caniuse-lite/data/regions/${regCode}.js`);
+      const unpacked = this.caniuse.region(regData);
+      for (const b of TARGET_BROWSERS) {
+        this.stats[b.key] = unpacked[b.caniuseKey] || {};
+      }
+      return regCode;
+    } catch {
+      // Fallback gracefully to global if regional file not bundled
+      for (const b of TARGET_BROWSERS) {
+        this.stats[b.key] = this.caniuse.agents[b.caniuseKey]?.usage_global || {};
+      }
+      return 'global';
+    }
   }
 
   _indexModernFeatures() {
@@ -117,6 +162,7 @@ export class CompatDatabase {
     for (const [builtinName, builtinObj] of Object.entries(this.bcd.javascript?.builtins || {})) {
       for (const [prop, val] of Object.entries(builtinObj)) {
         if (prop.startsWith('__') || prop.startsWith('@@') || !val?.__compat) continue;
+        if (UNIVERSAL_OR_ES5_PROPERTIES.has(prop)) continue;
         if (isModern(val.__compat)) {
           const support = this.getSupportMatrix(val.__compat);
           const specs = Array.isArray(val.__compat.spec_url)
@@ -166,22 +212,6 @@ export class CompatDatabase {
     return this.indexedPrototypeMethods.get(propName) || null;
   }
 
-  _computeGlobalStats() {
-    const stats = {};
-    for (const b of TARGET_BROWSERS) {
-      const browserData = caniuse.agents[b.caniuseKey];
-      if (browserData && browserData.usage_global) {
-        stats[b.key] = browserData.usage_global;
-      }
-    }
-    return stats;
-  }
-
-  _computeRegionStats(region = 'FR') {
-    // caniuse-lite includes global agents. Region fallbacks gracefully to global if region file not bundled
-    return this.globalStats;
-  }
-
   /**
    * Look up feature details in BCD
    * @param {string} category 'javascript.builtins' | 'api' | 'css'
@@ -221,9 +251,15 @@ export class CompatDatabase {
 
     for (const b of TARGET_BROWSERS) {
       const requiredVer = floorMatrix[b.key];
-      const browserUsage = this.globalStats[b.key] || {};
+      const browserUsage = this.stats[b.key] || {};
+      const agent = this.caniuse.agents[b.caniuseKey];
+      // In caniuse-lite regional files, evergreen mobile browsers (like and_chr) are recorded with version '0'.
+      // Their actual version tracks the latest release of that agent.
+      const latestVer = parseFloat(agent?.versions?.filter(Boolean).pop()) || 0;
+
       for (const [verStr, share] of Object.entries(browserUsage)) {
-        const ver = parseFloat(verStr);
+        if (!share) continue;
+        const ver = (verStr === '0') ? latestVer : parseFloat(verStr);
         totalMonitored += share;
         if (!requiredVer || ver >= requiredVer) {
           totalCovered += share;

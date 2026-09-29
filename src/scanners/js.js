@@ -106,7 +106,6 @@ export class JsScanner {
 
     // --- Lexical Scope & Polyfill / Guard Tracking ---
     const polyfilledFeatures = new Set();
-    const guardedIdentifiers = new Set();
 
     function extractBindings(pattern, set) {
       if (!pattern) return;
@@ -124,7 +123,13 @@ export class JsScanner {
     }
 
     function createScope(parent = null, isFunction = false) {
-      return { bindings: new Set(), parent, isFunction };
+      return {
+        bindings: new Set(),
+        guards: new Set(parent ? parent.guards : []),
+        inTryBlock: parent ? Boolean(parent.inTryBlock) : false,
+        parent,
+        isFunction
+      };
     }
 
     function addVar(scope, name) {
@@ -142,7 +147,51 @@ export class JsScanner {
       return false;
     }
 
-    // Pass 1: Walk to detect polyfill definitions and feature guards
+    function isGuarded(scope, name) {
+      let s = scope;
+      while (s) {
+        if (s.inTryBlock || s.guards?.has(name)) return true;
+        s = s.parent;
+      }
+      return false;
+    }
+
+    function addTargetNames(expr, set) {
+      if (!expr) return;
+      if (expr.type === 'Identifier') {
+        set.add(expr.name);
+      } else if (expr.type === 'MemberExpression' && expr.property?.name) {
+        set.add(expr.property.name);
+        if (expr.object?.name) set.add(`${expr.object.name}.${expr.property.name}`);
+      } else if (expr.type === 'Literal' && typeof expr.value === 'string') {
+        set.add(expr.value);
+      }
+    }
+
+    function extractGuardedNames(node) {
+      const names = new Set();
+      if (!node) return names;
+
+      if (node.type === 'LogicalExpression' && node.operator === '&&') {
+        for (const n of extractGuardedNames(node.left)) names.add(n);
+        for (const n of extractGuardedNames(node.right)) names.add(n);
+      } else if (node.type === 'UnaryExpression' && node.operator === 'typeof') {
+        addTargetNames(node.argument, names);
+      } else if (node.type === 'BinaryExpression') {
+        if (node.operator === 'in') {
+          addTargetNames(node.left, names);
+        } else {
+          const unary = (node.left?.type === 'UnaryExpression' && node.left.operator === 'typeof') ? node.left.argument
+            : ((node.right?.type === 'UnaryExpression' && node.right.operator === 'typeof') ? node.right.argument : null);
+          if (unary) addTargetNames(unary, names);
+        }
+      } else {
+        addTargetNames(node, names);
+      }
+      return names;
+    }
+
+    // Pass 1: Walk to detect polyfill definitions
     walk.simple(ast, {
       AssignmentExpression(node) {
         // window.X = ... or globalThis.X = ...
@@ -159,18 +208,6 @@ export class JsScanner {
             polyfilledFeatures.add('prototype.' + propName);
             polyfilledFeatures.add(propName);
           }
-        }
-      },
-      UnaryExpression(node) {
-        // typeof X !== 'undefined'
-        if (node.operator === 'typeof' && node.argument.type === 'Identifier') {
-          guardedIdentifiers.add(node.argument.name);
-        }
-      },
-      BinaryExpression(node) {
-        // 'ResizeObserver' in window
-        if (node.operator === 'in' && node.left.type === 'Literal' && typeof node.left.value === 'string') {
-          guardedIdentifiers.add(node.left.value);
         }
       }
     });
@@ -215,6 +252,39 @@ export class JsScanner {
         }
         for (const stmt of node.body) c(stmt, blockScope);
       },
+      IfStatement(node, scope, c) {
+        const guarded = extractGuardedNames(node.test);
+        const condScope = createScope(scope, false);
+        for (const g of guarded) condScope.guards.add(g);
+        c(node.test, condScope);
+        c(node.consequent, condScope);
+        if (node.alternate) {
+          const elseScope = createScope(scope, false);
+          c(node.alternate, elseScope);
+        }
+      },
+      TryStatement(node, scope, c) {
+        const tryScope = createScope(scope, false);
+        tryScope.inTryBlock = true;
+        c(node.block, tryScope);
+        if (node.handler) c(node.handler, scope);
+        if (node.finalizer) c(node.finalizer, scope);
+      },
+      UnaryExpression(node, scope, c) {
+        if (node.operator === 'typeof' && node.argument?.type === 'Identifier') {
+          // typeof X never throws ReferenceError and should not trigger Identifier visit
+          return;
+        }
+        c(node.argument, scope);
+      },
+      BinaryExpression(node, scope, c) {
+        if (node.operator === 'in' && node.left?.type === 'Literal') {
+          c(node.right, scope);
+          return;
+        }
+        c(node.left, scope);
+        c(node.right, scope);
+      },
       VariableDeclaration(node, scope, c) {
         for (const decl of node.declarations) {
           const names = new Set();
@@ -246,8 +316,19 @@ export class JsScanner {
         if (node.operator === '??') {
           addFinding('javascript.operators.nullish_coalescing', 'Nullish coalescing (??)', 'syntax');
         }
-        c(node.left, scope);
-        c(node.right, scope);
+        if (node.operator === '&&') {
+          const leftGuards = extractGuardedNames(node.left);
+          const leftScope = createScope(scope, false);
+          for (const g of leftGuards) leftScope.guards.add(g);
+          c(node.left, leftScope);
+
+          const rightScope = createScope(scope, false);
+          for (const g of leftGuards) rightScope.guards.add(g);
+          c(node.right, rightScope);
+        } else {
+          c(node.left, scope);
+          c(node.right, scope);
+        }
       },
       AssignmentExpression(node, scope, c) {
         if (node.operator === '??=') {
@@ -283,9 +364,22 @@ export class JsScanner {
         const propName = node.property?.name;
         if (!propName) return;
 
-        // crypto.randomUUID
-        if ((node.object?.name === 'crypto' || node.object?.property?.name === 'crypto') && propName === 'randomUUID') {
-          if (!polyfilledFeatures.has('randomUUID') && !guardedIdentifiers.has('randomUUID')) {
+        // window.X, globalThis.X, self.X
+        if (node.object?.type === 'Identifier' && ['window', 'globalThis', 'self'].includes(node.object.name)) {
+          const globalEntry = compatDb.lookupGlobal(propName);
+          if (globalEntry) {
+            if (!isGuarded(scope, propName) && !polyfilledFeatures.has(propName) && !polyfilledFeatures.has('api.' + propName)) {
+              addFinding(globalEntry.featureKey, globalEntry.name, 'api', globalEntry.compat, globalEntry.support);
+            }
+            return;
+          }
+        }
+
+        // crypto.randomUUID or window.crypto.randomUUID
+        const isCrypto = (node.object?.name === 'crypto') ||
+          (node.object?.type === 'MemberExpression' && node.object.property?.name === 'crypto');
+        if (isCrypto && propName === 'randomUUID') {
+          if (!isGuarded(scope, 'randomUUID') && !polyfilledFeatures.has('randomUUID')) {
             addFinding('api.Crypto.randomUUID', 'crypto.randomUUID()', 'api');
           }
           return;
@@ -296,7 +390,8 @@ export class JsScanner {
         if (objName) {
           const staticEntry = compatDb.lookupStatic(objName, propName);
           if (staticEntry) {
-            if (!polyfilledFeatures.has(staticEntry.featureKey) && !guardedIdentifiers.has(propName)) {
+            const qualifiedName = `${objName}.${propName}`;
+            if (!isGuarded(scope, propName) && !isGuarded(scope, qualifiedName) && !polyfilledFeatures.has(staticEntry.featureKey)) {
               addFinding(staticEntry.featureKey, staticEntry.name, 'builtin', staticEntry.compat, staticEntry.support);
             }
             return;
@@ -306,7 +401,10 @@ export class JsScanner {
         // Prototype methods: .at(), .replaceAll(), .findLast(), .toSorted(), .union(), etc.
         const protoEntry = compatDb.lookupPrototype(propName);
         if (protoEntry) {
-          if (!polyfilledFeatures.has(protoEntry.featureKey) && !polyfilledFeatures.has('prototype.' + propName) && !polyfilledFeatures.has(propName) && !guardedIdentifiers.has(propName)) {
+          if (!isGuarded(scope, propName) &&
+              !polyfilledFeatures.has(protoEntry.featureKey) &&
+              !polyfilledFeatures.has('prototype.' + propName) &&
+              !polyfilledFeatures.has(propName)) {
             addFinding(protoEntry.featureKey, protoEntry.name, 'prototype', protoEntry.compat, protoEntry.support);
           }
         }
@@ -322,7 +420,7 @@ export class JsScanner {
       Identifier(node, scope) {
         const name = node.name;
         if (isBound(scope, name)) return;
-        if (polyfilledFeatures.has(name) || polyfilledFeatures.has('api.' + name) || guardedIdentifiers.has(name)) return;
+        if (isGuarded(scope, name) || polyfilledFeatures.has(name) || polyfilledFeatures.has('api.' + name)) return;
 
         const globalEntry = compatDb.lookupGlobal(name);
         if (globalEntry) {

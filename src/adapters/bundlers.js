@@ -18,28 +18,34 @@ export function inspectProjectConfig(baseDir = process.cwd()) {
   const searchDirs = [baseDir];
   for (const ws of ['apps', 'packages']) {
     const wsDir = path.resolve(baseDir, ws);
-    if (fs.existsSync(wsDir) && fs.statSync(wsDir).isDirectory()) {
-      try {
+    try {
+      if (fs.existsSync(wsDir) && fs.statSync(wsDir).isDirectory()) {
         const subdirs = fs.readdirSync(wsDir, { withFileTypes: true });
         for (const sub of subdirs) {
-          if (sub.isDirectory()) {
-            searchDirs.push(path.join(wsDir, sub.name));
-          }
+          if (sub.isDirectory()) searchDirs.push(path.join(wsDir, sub.name));
         }
-      } catch {}
-    }
+      }
+    } catch {}
   }
+
+  const readFileSafe = (filePath) => {
+    try {
+      return fs.readFileSync(filePath, 'utf-8');
+    } catch {
+      return null;
+    }
+  };
 
   // 1. Check Vite configs
   const viteFilenames = ['vite.config.ts', 'vite.config.js', 'vite.config.mjs', 'vite.config.base.js'];
   for (const dir of searchDirs) {
     for (const fn of viteFilenames) {
       const full = path.join(dir, fn);
-      if (fs.existsSync(full)) {
+      const content = readFileSafe(full);
+      if (content !== null) {
         config.bundler = 'vite';
         const rel = path.relative(baseDir, full);
         if (!config.configsFound.includes(rel)) config.configsFound.push(rel);
-        const content = fs.readFileSync(full, 'utf-8');
         const targetMatch = content.match(/target:\s*['"]([^'"]+)['"]/);
         if (targetMatch && !config.target) {
           config.target = targetMatch[1];
@@ -53,40 +59,37 @@ export function inspectProjectConfig(baseDir = process.cwd()) {
   for (const dir of searchDirs) {
     for (const fn of postcssFilenames) {
       const full = path.join(dir, fn);
-      if (fs.existsSync(full)) {
+      const content = readFileSafe(full);
+      if (content !== null) {
         const rel = path.relative(baseDir, full);
         if (!config.configsFound.includes(rel)) config.configsFound.push(rel);
-        const content = fs.readFileSync(full, 'utf-8');
-        if (content.includes('postcss-preset-env') && !config.postcssPlugins.includes('postcss-preset-env')) {
-          config.postcssPlugins.push('postcss-preset-env');
-        }
-        if (content.includes('postcss-nested') && !config.postcssPlugins.includes('postcss-nested')) {
-          config.postcssPlugins.push('postcss-nested');
-        }
-        if (content.includes('custom-media') && !config.postcssPlugins.includes('postcss-custom-media')) {
-          config.postcssPlugins.push('postcss-custom-media');
+        for (const plugin of ['postcss-preset-env', 'postcss-nested', 'postcss-custom-media']) {
+          if (content.includes(plugin) && !config.postcssPlugins.includes(plugin)) {
+            config.postcssPlugins.push(plugin);
+          }
         }
       }
     }
   }
 
   // 3. Check Browserslist
-  const browserslistPaths = ['.browserslistrc', 'package.json'];
-  for (const bp of browserslistPaths) {
-    const full = path.resolve(baseDir, bp);
-    if (fs.existsSync(full)) {
-      if (bp === '.browserslistrc') {
-        config.browserslist = fs.readFileSync(full, 'utf-8').trim().split('\n').filter(Boolean);
-        config.configsFound.push(bp);
-      } else {
-        try {
-          const pkg = JSON.parse(fs.readFileSync(full, 'utf-8'));
-          if (pkg.browserslist) {
-            config.browserslist = pkg.browserslist;
-            config.configsFound.push('package.json#browserslist');
-          }
-        } catch {}
-      }
+  for (const dir of searchDirs) {
+    const brc = readFileSafe(path.join(dir, '.browserslistrc'));
+    if (brc !== null) {
+      config.browserslist = brc.trim().split('\n').filter(Boolean);
+      config.configsFound.push(path.relative(baseDir, path.join(dir, '.browserslistrc')));
+      break;
+    }
+    const pkgRaw = readFileSafe(path.join(dir, 'package.json'));
+    if (pkgRaw !== null) {
+      try {
+        const pkg = JSON.parse(pkgRaw);
+        if (pkg.browserslist) {
+          config.browserslist = pkg.browserslist;
+          config.configsFound.push(path.relative(baseDir, path.join(dir, 'package.json')) + '#browserslist');
+          break;
+        }
+      } catch {}
     }
   }
 
@@ -96,17 +99,15 @@ export function inspectProjectConfig(baseDir = process.cwd()) {
     for (const dir of searchDirs) {
       for (const tp of tsconfigPaths) {
         const full = path.join(dir, tp);
-        if (fs.existsSync(full)) {
-          try {
-            const raw = fs.readFileSync(full, 'utf-8');
-            const m = raw.match(/"target"\s*:\s*"([^"]+)"/i);
-            if (m) {
-              config.target = m[1];
-              const rel = path.relative(baseDir, full);
-              if (!config.configsFound.includes(rel)) config.configsFound.push(rel);
-              break;
-            }
-          } catch {}
+        const content = readFileSafe(full);
+        if (content !== null) {
+          const m = content.match(/"target"\s*:\s*"([^"]+)"/i);
+          if (m) {
+            config.target = m[1];
+            const rel = path.relative(baseDir, full);
+            if (!config.configsFound.includes(rel)) config.configsFound.push(rel);
+            break;
+          }
         }
       }
       if (config.target) break;
@@ -120,29 +121,41 @@ export function inspectProjectConfig(baseDir = process.cwd()) {
  * Resolve declared browser target versions and labels
  */
 export function resolveDeclaredTargets(config = {}) {
+  const targetLabel = config.target || (Array.isArray(config.browserslist) ? config.browserslist.join(', ') : 'ES2015');
+  const baselineSupport = getBaselineSupport(typeof config.target === 'string' ? config.target : 'ES2015');
   const result = {};
-  const targetLabel = config.target || 'ES2015';
-
-  const baselineSupport = getBaselineSupport(targetLabel);
 
   for (const b of TARGET_BROWSERS) {
     let ver = baselineSupport[b.key] || 1;
     let label = targetLabel;
 
+    const parseVersion = (val) => {
+      const m = String(val).match(new RegExp(`(?:${b.key}|${b.name})\\s*(?:>=?\\s*)?([0-9.]+)`, 'i'));
+      return m ? parseFloat(m[1]) : null;
+    };
+
     if (typeof config.target === 'string') {
-      const regex = new RegExp(`${b.key}\\s*([0-9.]+)`, 'i');
-      const m = config.target.match(regex);
-      if (m) {
-        ver = parseFloat(m[1]);
+      const v = parseVersion(config.target);
+      if (v !== null) {
+        ver = v;
         label = `${b.name} ${ver}+`;
       }
     } else if (Array.isArray(config.target)) {
       for (const item of config.target) {
-        const regex = new RegExp(`^${b.key}([0-9.]+)$`, 'i');
-        const m = String(item).match(regex);
-        if (m) {
-          ver = parseFloat(m[1]);
+        const v = parseVersion(item);
+        if (v !== null) {
+          ver = v;
           label = `${b.name} ${ver}+`;
+          break;
+        }
+      }
+    } else if (Array.isArray(config.browserslist)) {
+      for (const item of config.browserslist) {
+        const v = parseVersion(item);
+        if (v !== null) {
+          ver = v;
+          label = `${b.name} ${ver}+`;
+          break;
         }
       }
     }

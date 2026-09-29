@@ -4,25 +4,21 @@
 export const EFFORT_LEVELS = {
   1: {
     label: 'Trivial Polyfill',
-    timeEst: '~5 mins',
     description: 'Lightweight runtime polyfill (< 1KB) with zero architectural impact.',
     category: 'polyfill'
   },
   2: {
     label: 'Configuration',
-    timeEst: '~15 mins',
     description: 'Bundler syntax downleveling or CSS transform plugin (Vite / PostCSS / Babel).',
     category: 'config'
   },
   3: {
     label: 'Moderate Polyfill',
-    timeEst: '~45 mins',
     description: 'Heavier polyfill or shim (5-20KB) with potential runtime/perf trade-offs.',
     category: 'heavy-polyfill'
   },
   4: {
     label: 'Architectural Refactor',
-    timeEst: 'Refactor',
     description: 'Structural web feature without clean polyfill. Requires progressive enhancement.',
     category: 'refactor'
   }
@@ -118,7 +114,7 @@ export const REMEDIATION_CATALOG = {
     costKb: 0.1
   },
 
-  // --- Effort 2 : Bundler Config & CSS Transforms (~15 mins) ---
+  // --- Effort 2 : Bundler Config & CSS Transforms ---
   'javascript.operators.optional_chaining': {
     effort: 2,
     fix: 'Adjust bundler target (e.g. Vite target: "es2019")',

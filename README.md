@@ -1,6 +1,6 @@
 # compat-audit
 
-> Browser compatibility engine and AI agent skill scaffolder for compiled production assets.
+> Zero-config browser compatibility engine and AI agent skill scaffolder for compiled production bundles in single-page apps and monorepos.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)](https://nodejs.org/)
@@ -10,12 +10,14 @@
 
 ## Overview
 
-Static linters analyze raw source code, missing runtime realities:
+Static linters inspect source files before compilation, missing runtime realities:
 - Modern bundlers transpile syntax (classes, arrow functions) but do not polyfill runtime global APIs (`structuredClone`, `Array.prototype.at`, `crypto.randomUUID`, `ResizeObserver`).
 - Third-party packages in `node_modules` inject untranspiled CSS (`&` nesting, `oklch()`, `@container`) and modern syntax leaks directly into production chunks.
-- Internal monorepo packages often bypass application-level Babel/Vite downleveling.
+- Monorepo packages frequently bypass application-level Vite, Babel, or SWC downleveling configurations.
 
-`compat-audit` parses the AST of compiled production bundles (`dist/`, `build/`, `.output/`) and evaluates findings against MDN Browser Compatibility Data and Can I Use statistics across both Desktop and Mobile browser engines (Chrome, Safari, Firefox, Edge, iOS Safari, Chrome Android, Samsung Internet). It computes real browser support floors, detects Safari and WebKit visual quirks (viewport jumps, missing prefixes, flexbox blowouts), detects drift against declared targets, and provides deterministic remediation plans.
+`compat-audit` parses the AST of compiled production bundles (`dist/`, `build/`, `.output/`) and evaluates features against MDN Browser Compatibility Data and Can I Use statistics across key Desktop and Mobile engines (Chrome, Safari, Firefox, Edge, iOS Safari, Chrome Android, Samsung Internet).
+
+It computes exact browser support floors, isolates guarded code, traces vendor package leaks via source maps, detects Safari and WebKit rendering traps, quantifies market coverage drift against declared targets, and outputs deterministic remediation plans.
 
 ---
 
@@ -23,19 +25,25 @@ Static linters analyze raw source code, missing runtime realities:
 
 ### 1. Direct CLI Audit
 
-Run directly against your build directory:
+Run directly against your project or monorepo workspace:
 
 ```bash
-# Auto-detects dist/ and scans bundle
+# Auto-detects dist/ and scans production assets
 npx compat-audit
 
-# Force a clean build before scanning to ensure fresh assets
-npx compat-audit --build --json
+# Force a clean build before scanning to guarantee fresh assets
+npx compat-audit --build
+
+# Specify audience region (default: global)
+npx compat-audit --region FR
+
+# Audit a specific project within a monorepo workspace
+npx compat-audit --project apps/web
 ```
 
 ### 2. Scaffold AI Agent Skills
 
-Install skills for AI coding assistants (Claude Code, Google Antigravity, Cursor, Windsurf, Copilot):
+Install skills for AI coding assistants (Claude Code, Google Antigravity, Cursor, Windsurf, Codex, Copilot):
 
 ```bash
 npx compat-audit --init-skills
@@ -45,9 +53,19 @@ Supports project-level (`.agents/skills/`) and global (`~/.agents/skills/`) inst
 
 ---
 
+## Key Features
+
+- **Semantic AST Lexical Scope Tracking**: Acorn AST traversal resolves variable scopes and function parameters to prevent false positive collisions between local identifiers and global Web APIs.
+- **Intelligent Guard & Polyfill Detection**: Code protected by runtime guards (`typeof Window !== 'undefined'`, `'at' in Array.prototype`, `try-catch`) is recognized and excluded from compatibility gaps.
+- **Monorepo & Workspace Autodetection**: Automatically discovers workspace boundaries (`pnpm-workspace.yaml`, `workspace.yml`, npm/yarn/bun `workspaces`, `lerna.json`), generates top-level summary tables, and outputs dedicated reports per sub-project.
+- **Parametric Audience Coverage**: Dynamic region support (`--region <code>`, e.g. `global`, `FR`, `US`, `DE`) computes both declared *Target Coverage* and actual *Measured Coverage* to measure real audience drift.
+- **Safari & WebKit Trap Detection**: Flags missing `-webkit-` prefixes (`backdrop-filter`, `line-clamp`, `appearance`), 100vh viewport bugs without dynamic viewport unit (`100dvh`) fallbacks, and flexbox overflow traps.
+
+---
+
 ## How the Engine Works
 
-`compat-audit` is a deterministic static analysis engine. It runs locally without external network requests or AI inference at audit time.
+`compat-audit` operates strictly offline with zero external network requests or AI inference during analysis:
 
 ```mermaid
 flowchart LR
@@ -57,63 +75,42 @@ flowchart LR
     C & D --> E["Terminal / Markdown Formatter"]
 ```
 
-1. **Configuration Inspection (`inspectProjectConfig`)**: Parses project configuration files (`vite.config.*`, `tsconfig.json`, `postcss.config.*`, `.browserslistrc`) to discover the developer's declared intent (such as `target: 'es2020'` or PostCSS transforms).
-2. **Bundle AST Scanning (`JsScanner` & `CssScanner`)**: Parses compiled production assets (`dist/`, `.output/`, etc.) with Acorn and css-tree. Resolves lexical variable scopes to discard local bindings, identifies unhandled global Web APIs, inspects CSS properties for missing vendor prefixes, and links source maps (`.map`) to trace origin packages.
-3. **Intent vs Reality Cross-Referencing (`compareIntentVsReality`)**: Correlates declared configurations against actual bundle contents to pinpoint divergence, such as bundlers transpiling syntax without polyfilling runtime globals.
-4. **Deterministic Effort Scoring (`scoreIssue`)**: Evaluates every finding against MDN Browser Compatibility Data and Can I Use metrics, mapping each to a 4-tier effort taxonomy with concrete remediation advice.
+1. **Configuration Inspection (`inspectProjectConfig`)**: Parses config files (`vite.config.*`, `tsconfig.json`, `postcss.config.*`, `.browserslistrc`) to extract declared intent (`target: 'es2020'` or PostCSS plugins).
+2. **AST Scanning (`JsScanner` & `CssScanner`)**: Parses compiled assets with Acorn and css-tree. Resolves scopes, detects unguarded Web APIs, inspects CSS selectors/properties, and correlates `.map` source maps with originating vendor packages.
+3. **Intent vs Reality Cross-Referencing (`compareIntentVsReality`)**: Evaluates declared compiler targets against actual bundle contents to identify configuration drift.
+4. **Effort Scoring (`scoreIssue`)**: Classifies issues into a 4-tier effort taxonomy with concrete remediation actions.
 
 ---
 
-## Example Output
+## Monorepo & Workspaces
 
-```
-╔═══════════════════════════════════════════════════════════════════════════╗
-║                       COMPAT-AUDIT BUNDLE REPORT                          ║
-╚═══════════════════════════════════════════════════════════════════════════╝
+Running `compat-audit` at the root of a workspace automatically discovers configured projects:
+- `pnpm-workspace.yaml` / `pnpm-workspace.yml`
+- `workspace.yml` / `workspace.yaml`
+- `"workspaces"` field in `package.json` (npm, Yarn, Bun)
+- `lerna.json`
 
-Status:             COMPATIBILITY GAP DETECTED
-Scanned Directory:  dist
-Assets Scanned:     14 files (8 JS, 4 CSS, 2 HTML)
-Estimated Coverage: 94.6% global audience
-Compatibility Gap:  -5.4%
+The generated report contains:
+1. **Monorepo Summary Table**: Overview of all sub-projects with declared targets, measured floors, audience coverage, and compliance verdicts.
+2. **Individual Project Reports**: Full diagnostics, browser headroom breakdown, and actionable remediation steps per project.
 
-BROWSER COMPATIBILITY SUMMARY:
-   [Desk]   Chrome           (target: Chrome 90+)  min: 51+     +39 vers headroom
-   [Desk]   Safari           (target: Safari 14+)  min: 18+     Gap: -4.0 vers
-   [Desk]   Firefox          (target: Firefox 88+) min: 54+     +34 vers headroom
-   [Desk]   Edge             (target: Edge 90+)    min: 15+     +75 vers headroom
-   [Mobile] iOS Safari       (target: iOS 14+)     min: 18+     Gap: -4.0 vers
-   [Mobile] Chrome Android   (target: Chrome 90+)  min: 51+     +39 vers headroom
-   [Mobile] Samsung Internet (target: Samsung 14+) min: 5.0+    +9 vers headroom
-
-DIAGNOSTICS & CODE FINDINGS:
-   ! Syntax vs Runtime Gap: Your bundler targets 'es2020', but the bundle contains runtime Web APIs (queueMicrotask(), crypto.randomUUID(), ResizeObserver). Bundlers transpile JavaScript syntax (like arrow functions or classes) but DO NOT polyfill global runtime APIs without dedicated polyfills.
-   ! CSS Nesting without fallback: Native CSS nesting (&) is emitted in your CSS bundle. Older browser engines (Safari < 16.5, Chrome < 112) will ignore these nested rules.
-   ! Safari & WebKit Visual Quirks Detected: Detected 5 WebKit rendering pitfall(s): Missing -webkit-text-size-adjust: 100% (iOS Safari landscape font scaling), 100vh height without dvh fallback (iOS Safari address bar resize bug), Missing -webkit-backdrop-filter prefix (Safari < 18 breaks backdrop-filter), line-clamp missing -webkit-line-clamp and -webkit-box-orient (WebKit multi-line truncation), Custom form control missing -webkit-appearance: none (iOS Safari native gradient/border). Safari requires dedicated vendor prefixes (-webkit-) and graceful degradation for layout stability.
-
-ACTIONABLE REMEDIATIONS (Polyfills & Configuration):
-   ┌───────┬───────────────────────────────┬─────────────┬─────────────┬────────────────────────────────────────────────────────────────────────┐
-   │ Level │ Feature                       │ Category    │ Est. Time   │ Recommended Action                                                     │
-   ├───────┼───────────────────────────────┼─────────────┼─────────────┼────────────────────────────────────────────────────────────────────────┤
-   │   E1  │ crypto.randomUUID()           │ api         │ ~5 mins     │ Use crypto.getRandomValues fallback or uuid v4                         │
-   │   E1  │ queueMicrotask()              │ api         │ ~5 mins     │ Add queue-microtask or Promise.resolve polyfill                        │
-   │   E1  │ -webkit-backdrop-filter       │ safari-quirk│ ~5 mins     │ Add -webkit-backdrop-filter alongside backdrop-filter (Safari < 18)    │
-   │   E1  │ 100vh viewport unit           │ safari-quirk│ ~5 mins     │ Use graceful degradation: height: 100vh; @supports (height: 100dvh)    │
-   │   E2  │ Native CSS Nesting (&)        │ selector    │ ~15 mins    │ Enable postcss-nested in postcss.config.js                            │
-   │   E3  │ ResizeObserver                │ api         │ ~45 mins    │ Import resize-observer-polyfill (2.5KB gzip) if !window.ResizeObserver │
-   └───────┴───────────────────────────────┴─────────────┴─────────────┴────────────────────────────────────────────────────────────────────────┘
+To audit only a single package within the workspace:
+```bash
+npx compat-audit --project @scope/web
 ```
 
 ---
 
-## Effort Levels
+## Effort Taxonomy (E1 to E4)
 
-Detected issues are categorized into four effort tiers based on implementation risk and cost:
+Detected issues are categorized into four effort tiers:
 
-- **E1 (Lightweight Runtime Polyfill, ~5m)**: Inline zero-dependency shims (<300B total) with zero architectural risk (`structuredClone`, `Array.prototype.at`, `Object.hasOwn`, `crypto.randomUUID`, `Promise.withResolvers`).
-- **E2 (Configuration Change, ~15m)**: Bundler target adjustments or PostCSS plugins (`postcss-nested`, syntax downleveling, color fallbacks).
-- **E3 (Moderate Polyfill, ~45m)**: Larger shims (5-20KB) with runtime trade-offs (`ResizeObserver`, `IntersectionObserver`).
-- **E4 (Architectural Refactor)**: Layout features without direct polyfills (dynamic `:has()`, `@container`).
+| Tier | Type | Examples | Typical Action |
+|---|---|---|---|
+| **E1** | Lightweight Runtime Polyfill | `structuredClone`, `crypto.randomUUID`, `Array.at`, `-webkit-` prefixes | Inline zero-dependency shim (< 300B) |
+| **E2** | Bundler / PostCSS Config | `postcss-nested`, Vite downleveling targets, color fallbacks | Update configuration in `vite.config` or `postcss.config` |
+| **E3** | Moderate Polyfill | `ResizeObserver`, `IntersectionObserver` | Add targeted polyfill package (5-20KB) |
+| **E4** | Architectural Refactor | `:has()`, `@container` | Progressive enhancement or layout fallback |
 
 ---
 
@@ -127,21 +124,23 @@ compat-audit [dir] [options]
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `[dir]` | `string` | auto-detected | Path to compiled bundle directory (`dist`, `.output/public`, etc.). |
-| `--build` | `boolean` | `false` | Unconditionally execute a fresh build before scanning. |
-| `--format <type>` | `string` | `terminal` | Output format: `terminal`, `json`, `markdown`. |
+| `[dir]` | `string` | auto-detected | Target directory containing compiled assets (`dist`, `.output/public`, etc.). |
+| `--build` | `boolean` | `false` | Force a fresh production build before auditing. |
+| `--project, -p <name>` | `string` | - | Filter audit to a specific project in a monorepo workspace. |
+| `--region, -r <code>` | `string` | `global` | Audience region for market share coverage (e.g. `global`, `FR`, `US`). |
+| `--format <type>` | `string` | `terminal` | Output format: `terminal` (default), `json`, `markdown`. |
 | `--json` | `boolean` | `false` | Shorthand for `--format json`. |
 | `--markdown`, `--md` | `boolean` | `false` | Shorthand for `--format markdown`. |
-| `--ci`, `--fail-on-gap`, `--fail-on-incompatible` | `boolean` | `false` | Exit with code 1 if compatibility gaps or quick wins are detected (CI mode). |
-| `init`, `--init-skills` | command | - | Interactively install AI agent skills. |
-| `--local`, `-l` | `boolean` | `true` | Install skills to project workspace without prompting. |
-| `--global`, `-g` | `boolean` | `false` | Install skills globally to user home directories without prompting. |
+| `--ci`, `--fail-on-gap` | `boolean` | `false` | Exit with code 1 if compatibility gaps are detected (CI mode). |
+| `init`, `--init-skills` | command | - | Scaffold AI agent skills interactively. |
+| `--local`, `-l` | `boolean` | `true` | Install skills to project workspace (`.agents/skills/`). |
+| `--global`, `-g` | `boolean` | `false` | Install skills globally to user home directories. |
 | `-h`, `--help` | - | - | Display help menu. |
 | `-v`, `--version` | - | - | Display current version. |
 
 ### CI / PR Verification Example
 
-Integrate into GitHub Actions to prevent compatibility regressions:
+Prevent compatibility regressions in GitHub Actions:
 
 ```yaml
 - name: Audit Browser Compatibility
@@ -152,10 +151,10 @@ Integrate into GitHub Actions to prevent compatibility regressions:
 
 ## AI Agent Integration
 
-`compat-audit init` installs agent skills for AI assistants (Claude Code, Google Antigravity, Cursor, etc.):
+`compat-audit init` registers agent skills for AI assistants:
 
-- **`/compat-audit`**: Runs bundle audits, checks declared compiler targets, and reports compatibility gaps across browser engines.
-- **`/compat-optimize`**: Proposes targeted fixes (progressive enhancement fallbacks, inline runtime polyfills, bundler/PostCSS configuration) and verifies resolution with a post-fix audit.
+- **`/compat-audit`**: Runs bundle audits, checks declared targets, and outputs cross-browser support tables.
+- **`/compat-optimize`**: Interactively applies targeted fixes (progressive enhancement fallbacks, inline runtime polyfills, bundler/PostCSS configuration) and validates fixes with post-fix audits.
 
 ---
 
@@ -164,17 +163,18 @@ Integrate into GitHub Actions to prevent compatibility regressions:
 ```javascript
 import { auditBundle, initSkills } from 'compat-audit';
 
-// Run bundle audit programmatically
+// Audit bundle programmatically
 const report = await auditBundle({
   dir: 'dist',
-  build: true, // Forces fresh build before analysis
+  region: 'global', // or 'FR', 'US', etc.
+  build: true,
   cwd: process.cwd()
 });
 
 console.log(report.verdict); // 'COMPLIANT' | 'COMPATIBILITY GAP DETECTED'
-console.log(report.browserSummary);
+console.log(report.measuredCoverage); // e.g. 98.5
 
-// Scaffold skills programmatically
+// Scaffold agent skills programmatically
 initSkills({ cwd: process.cwd(), global: false });
 ```
 
