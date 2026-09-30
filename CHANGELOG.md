@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/Goodzilla/compat-audit/compare/v1.11.1...v1.12.0) (2026-09-30)
+
+
+### Features
+
+* replace effort scoring with CI/Sec severity scale and dedicated optimization playbook ([d553dfa](https://github.com/Goodzilla/compat-audit/commit/d553dfab4e98c7f99e84703c9c62d14eb9a17b54))
+
 ## [1.11.1](https://github.com/Goodzilla/compat-audit/compare/v1.11.0...v1.11.1) (2026-09-29)
 
 
