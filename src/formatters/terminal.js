@@ -87,35 +87,61 @@ export function formatTerminalSingleReport(report, options = {}) {
     lines.push('');
   }
 
-  // 4. Actionable Remediation Plan
-  lines.push(pc.bold(pc.underline('ACTIONABLE REMEDIATIONS (Polyfills & Configuration):')));
-  if (report.quickWins.length === 0) {
-    lines.push(`   ${pc.green('No immediate remediation required. Bundle meets or exceeds all declared targets.')}`);
+  // 4. Compatibility Issues & Breaking Impacts
+  lines.push(pc.bold(pc.underline('COMPATIBILITY ISSUES & BREAKING IMPACTS:')));
+  const issues = report.issues || [];
+  if (issues.length === 0) {
+    lines.push(`   ${pc.green('No compatibility issues found. Bundle meets or exceeds all declared targets.')}`);
   } else {
-    lines.push(`   ┌───────┬───────────────────────────────┬─────────────┬──────────────────────────────────────────────────────────────────┐`);
-    lines.push(`   │ ${pc.bold('Level')} │ ${pc.bold('Feature')}                       │ ${pc.bold('Category')}    │ ${pc.bold('Recommended Action')}                                               │`);
-    lines.push(`   ├───────┼───────────────────────────────┼─────────────┼──────────────────────────────────────────────────────────────────┤`);
+    const c1 = 12; // Severity
+    const c2 = 26; // Feature
+    const c3 = 36; // Impact / Error Type
+    const c4 = 28; // Broken Browsers
+    const c5 = 16; // Audience Loss
 
-    for (const item of report.quickWins.slice(0, 8)) {
-      const levelBadge = item.effort === 1 ? pc.bgGreen(pc.black(` E1 `)) : pc.bgYellow(pc.black(` E2 `));
-      const feat = (item.name || item.featureKey).padEnd(29).slice(0, 29);
-      const cat = (item.category || '').padEnd(11).slice(0, 11);
-      const action = (item.remediation || '').padEnd(64).slice(0, 64);
-      lines.push(`   │  ${levelBadge} │ ${feat} │ ${cat} │ ${action} │`);
+    const top = '   ┌' + '─'.repeat(c1) + '┬' + '─'.repeat(c2) + '┬' + '─'.repeat(c3) + '┬' + '─'.repeat(c4) + '┬' + '─'.repeat(c5) + '┐';
+    const mid = '   ├' + '─'.repeat(c1) + '┼' + '─'.repeat(c2) + '┼' + '─'.repeat(c3) + '┼' + '─'.repeat(c4) + '┼' + '─'.repeat(c5) + '┤';
+    const bot = '   └' + '─'.repeat(c1) + '┴' + '─'.repeat(c2) + '┴' + '─'.repeat(c3) + '┴' + '─'.repeat(c4) + '┴' + '─'.repeat(c5) + '┘';
+
+    const h1 = ' ' + pc.bold('Severity'.padEnd(c1 - 2)) + ' ';
+    const h2 = ' ' + pc.bold('Feature'.padEnd(c2 - 2)) + ' ';
+    const h3 = ' ' + pc.bold('Impact / Error Type'.padEnd(c3 - 2)) + ' ';
+    const h4 = ' ' + pc.bold('Broken Browsers'.padEnd(c4 - 2)) + ' ';
+    const h5 = ' ' + pc.bold('Audience Loss'.padEnd(c5 - 2)) + ' ';
+
+    lines.push(top);
+    lines.push(`   │${h1}│${h2}│${h3}│${h4}│${h5}│`);
+    lines.push(mid);
+
+    for (const item of issues.slice(0, 10)) {
+      let badge = item.severity;
+      if (item.severity === 'BLOCKING') {
+        badge = pc.bgRed(pc.white(pc.bold(' BLOCKING ')));
+      } else if (item.severity === 'HIGH') {
+        badge = pc.bgYellow(pc.black(pc.bold('   HIGH   ')));
+      } else if (item.severity === 'MEDIUM') {
+        badge = pc.bgCyan(pc.black('  MEDIUM  '));
+      } else {
+        badge = pc.bgWhite(pc.black('   LOW    '));
+      }
+
+      const f1 = ' ' + badge + ' ';
+      const f2 = ' ' + (item.name || item.featureKey).padEnd(c2 - 2).slice(0, c2 - 2) + ' ';
+      const f3 = ' ' + (item.impactType || '').padEnd(c3 - 2).slice(0, c3 - 2) + ' ';
+      const brokenStr = (item.brokenBrowsers && item.brokenBrowsers.length > 0)
+        ? item.brokenBrowsers.join(', ')
+        : 'All modern';
+      const f4 = ' ' + brokenStr.padEnd(c4 - 2).slice(0, c4 - 2) + ' ';
+      const lossStr = item.audienceLossDisplay || (item.audienceLoss ? `${item.audienceLoss}%` : '0%');
+      const f5 = ' ' + lossStr.padEnd(c5 - 2).slice(0, c5 - 2) + ' ';
+
+      lines.push(`   │${f1}│${f2}│${f3}│${f4}│${f5}│`);
     }
-    lines.push(`   └───────┴───────────────────────────────┴─────────────┴──────────────────────────────────────────────────────────────────┘`);
-    lines.push(`   ${pc.dim('Legend: E1 = Lightweight runtime polyfill | E2 = Bundler/PostCSS transpile config')}`);
+    lines.push(bot);
+    lines.push(`   ${pc.dim('Legend: BLOCKING = Script crash/SyntaxError | HIGH = ReferenceError | MEDIUM = Broken CSS | LOW = Visual quirk')}`);
+    lines.push(`   ${pc.cyan('Run `/compat-optimize` to interactively resolve these compatibility issues.')}`);
   }
   lines.push('');
-
-  // Architectural Constraints
-  if (report.structuralBlockers && report.structuralBlockers.length > 0) {
-    lines.push(pc.bold(pc.magenta('ARCHITECTURAL CONSTRAINTS (Effort 3 & 4 - Requires Architectural Choice):')));
-    for (const item of report.structuralBlockers) {
-      lines.push(`   • ${pc.bold(item.name)} (${item.featureKey}) : ${pc.dim(item.remediation)}`);
-    }
-    lines.push('');
-  }
 
   if (!options.isSubProject) {
     lines.push(pc.dim('Run with --format json or --format markdown for CI/CD or PR integrations.'));

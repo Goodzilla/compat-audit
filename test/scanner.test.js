@@ -4,7 +4,7 @@ import { CompatDatabase } from '../src/data/compat-db.js';
 import { JsScanner } from '../src/scanners/js.js';
 import { CssScanner } from '../src/scanners/css.js';
 import { HtmlScanner } from '../src/scanners/html.js';
-import { scoreIssue } from '../src/scoring/effort.js';
+import { evaluateSeverity } from '../src/scoring/severity.js';
 
 describe('compat-audit core engine tests', () => {
   const db = new CompatDatabase();
@@ -75,16 +75,51 @@ describe('compat-audit core engine tests', () => {
     assert.ok(keys.includes('html.elements.img.loading'));
   });
 
-  it('scores issues accurately according to effort taxonomy', () => {
-    const issue1 = scoreIssue('api.structuredClone', 'structuredClone()', 'api', {}, null);
-    assert.equal(issue1.effort, 1, 'structuredClone should be Effort 1 (trivial quick-win polyfill)');
-    assert.ok(issue1.remediation.includes('@ungap/structured-clone'));
+  it('evaluates compatibility issues according to CI/Sec severity scale (BLOCKING, HIGH, MEDIUM, LOW)', () => {
+    // 1. BLOCKING: Syntax error
+    const syntaxIssue = evaluateSeverity({
+      featureKey: 'javascript.operators.optional_chaining',
+      name: 'Optional chaining',
+      category: 'syntax'
+    });
+    assert.equal(syntaxIssue.severity, 'BLOCKING');
+    assert.equal(syntaxIssue.impactType, 'SyntaxError (Script parse error)');
 
-    const issue2 = scoreIssue('javascript.operators.optional_chaining', 'Optional chaining', 'syntax', {}, null);
-    assert.equal(issue2.effort, 2, 'Syntax downleveling should be Effort 2 (bundler config)');
+    // 2. BLOCKING: Prototype method (TypeError)
+    const protoIssue = evaluateSeverity({
+      featureKey: 'javascript.builtins.Array.at',
+      name: 'Array.prototype.at()',
+      category: 'prototype'
+    });
+    assert.equal(protoIssue.severity, 'BLOCKING');
+    assert.equal(protoIssue.impactType, 'TypeError (Undefined method)');
 
-    const issue3 = scoreIssue('css.selectors.has', ':has()', 'selector', {}, null);
-    assert.equal(issue3.effort, 4, ':has() should be Effort 4 (structural refactor)');
+    // 3. HIGH: Global API missing (ReferenceError)
+    const apiIssue = evaluateSeverity({
+      featureKey: 'api.structuredClone',
+      name: 'structuredClone()',
+      category: 'api'
+    });
+    assert.equal(apiIssue.severity, 'HIGH');
+    assert.equal(apiIssue.impactType, 'ReferenceError (Missing API)');
+
+    // 4. MEDIUM: Modern CSS layout / selectors
+    const cssIssue = evaluateSeverity({
+      featureKey: 'css.selectors.has',
+      name: ':has()',
+      category: 'css'
+    });
+    assert.equal(cssIssue.severity, 'MEDIUM');
+    assert.equal(cssIssue.impactType, 'Ignored CSS (Layout degradation)');
+
+    // 5. LOW: Safari quirk / vendor prefix
+    const quirkIssue = evaluateSeverity({
+      featureKey: 'safari.css.backdrop-filter-prefix',
+      name: 'Missing -webkit-backdrop-filter',
+      category: 'css'
+    });
+    assert.equal(quirkIssue.severity, 'LOW');
+    assert.equal(quirkIssue.impactType, 'Visual Glitch (Prefix missing)');
   });
 
   it('detects Safari and WebKit visual quirks and rendering traps in CSS', () => {
@@ -127,8 +162,12 @@ describe('compat-audit core engine tests', () => {
     assert.ok(keys.includes('safari.css.text-size-adjust'), 'Should detect text-size-adjust without -webkit-');
 
     // Test scoring for Safari quirks
-    const quirkScore = scoreIssue('safari.css.backdrop-filter-prefix', 'Missing -webkit-backdrop-filter', 'safari-quirk', {}, null);
-    assert.equal(quirkScore.effort, 1);
-    assert.ok(quirkScore.remediation.includes('-webkit-backdrop-filter'));
+    const quirkScore = evaluateSeverity({
+      featureKey: 'safari.css.backdrop-filter-prefix',
+      name: 'Missing -webkit-backdrop-filter',
+      category: 'css'
+    });
+    assert.equal(quirkScore.severity, 'LOW');
+    assert.equal(quirkScore.impactType, 'Visual Glitch (Prefix missing)');
   });
 });

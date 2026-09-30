@@ -111,8 +111,7 @@ describe('Report formatters', () => {
         gap: 0
       }
     ],
-    quickWins: [],
-    structuralBlockers: [],
+    issues: [],
     diagnostics: []
   };
 
@@ -144,6 +143,50 @@ describe('Report formatters', () => {
     assert.ok(term.includes('[Desk]'), 'Terminal report must show [Desk] badge');
     assert.ok(!term.includes('Chrome all'), 'Must not contain "Chrome all"');
     assert.ok(term.includes('target: ES2015 ~ v90+'), 'Terminal report must display corresponding browser version for standard targets');
+  });
+
+  it('formats compatibility issues table with severity badges and impact types in terminal and markdown reports', () => {
+    const reportWithIssues = {
+      ...mockReportCompliant,
+      hasGaps: true,
+      issues: [
+        {
+          featureKey: 'javascript.builtins.Array.at',
+          name: 'Array.prototype.at()',
+          category: 'prototype',
+          severity: 'BLOCKING',
+          impactType: 'TypeError (Undefined method)',
+          brokenBrowsers: ['Safari < 15.4'],
+          audienceLoss: 3.2,
+          audienceLossDisplay: '3.2%'
+        },
+        {
+          featureKey: 'api.structuredClone',
+          name: 'structuredClone()',
+          category: 'api',
+          severity: 'HIGH',
+          impactType: 'ReferenceError (Missing API)',
+          brokenBrowsers: ['Safari < 15.4', 'Chrome < 98'],
+          audienceLoss: 4.1,
+          audienceLossDisplay: '4.1%'
+        }
+      ]
+    };
+
+    const term = formatTerminalReport(reportWithIssues);
+    assert.ok(term.includes('COMPATIBILITY ISSUES & BREAKING IMPACTS:'));
+    assert.ok(term.includes('BLOCKING'));
+    assert.ok(term.includes('HIGH'));
+    assert.ok(term.includes('TypeError (Undefined method)'));
+    assert.ok(term.includes('ReferenceError (Missing API)'));
+    assert.ok(term.includes('/compat-optimize'));
+
+    const md = formatMarkdownReport(reportWithIssues);
+    assert.ok(md.includes('Compatibility Issues & Breaking Impacts'));
+    assert.ok(md.includes('| Severity | Feature | Impact / Error Type | Broken Browsers | Audience Loss |'));
+    assert.ok(md.includes('**BLOCKING**'));
+    assert.ok(md.includes('**HIGH**'));
+    assert.ok(md.includes('/compat-optimize'));
   });
 
   it('formats audience gap correctly for drift vs target and positive headroom', () => {

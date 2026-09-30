@@ -18,6 +18,7 @@ export async function runCli(argv = []) {
   let build = false;
   let project = null;
   let region = 'global';
+  let all = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -66,6 +67,8 @@ export async function runCli(argv = []) {
       format = 'markdown';
     } else if (arg === '--build') {
       build = true;
+    } else if (arg === '--all') {
+      all = true;
     } else if ((arg === '--project' || arg === '-p') && argv[i + 1]) {
       project = argv[++i];
     } else if ((arg === '--region' || arg === '-r') && argv[i + 1]) {
@@ -78,7 +81,7 @@ export async function runCli(argv = []) {
   }
 
   try {
-    const report = await auditBundle({ dir, build, project, region });
+    const report = await auditBundle({ dir, build, project, region, all });
 
     if (format === 'json') {
       console.log(formatJsonReport(report));
@@ -118,6 +121,7 @@ Options:
   --format <type>       Output format: terminal (default), json, markdown
   --json                Shorthand for --format json
   --markdown, --md      Shorthand for --format markdown
+  --all                 List all detected modern features, not just gap-causing issues
   --ci, --fail-on-gap   Exit with code 1 if compatibility gaps or quick wins are detected (CI mode)
   --fail-on-incompatible Alias for --fail-on-gap
   -h, --help            Display this help message

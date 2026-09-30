@@ -1,164 +1,116 @@
 /**
- * 4-Level Deterministic Effort Scoring
- */
-export const EFFORT_LEVELS = {
-  1: {
-    label: 'Trivial Polyfill',
-    description: 'Lightweight runtime polyfill (< 1KB) with zero architectural impact.',
-    category: 'polyfill'
-  },
-  2: {
-    label: 'Configuration',
-    description: 'Bundler syntax downleveling or CSS transform plugin (Vite / PostCSS / Babel).',
-    category: 'config'
-  },
-  3: {
-    label: 'Moderate Polyfill',
-    description: 'Heavier polyfill or shim (5-20KB) with potential runtime/perf trade-offs.',
-    category: 'heavy-polyfill'
-  },
-  4: {
-    label: 'Architectural Refactor',
-    description: 'Structural web feature without clean polyfill. Requires progressive enhancement.',
-    category: 'refactor'
-  }
-};
-
-/**
- * Known remediation catalog with pre-mapped effort scores & recommendations
+ * Optimization Playbook & Remediation Catalog for /compat-optimize skill
  */
 export const REMEDIATION_CATALOG = {
-  // --- Effort 1 : Trivial Runtime Polyfills (< 1KB) ---
+  // --- Lightweight Runtime Polyfills (< 1KB) ---
   'javascript.builtins.Array.at': {
-    effort: 1,
     fix: 'Add tiny Array.prototype.at polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Object.hasOwn': {
-    effort: 1,
     fix: 'Add tiny Object.hasOwn polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Promise.allSettled': {
-    effort: 1,
     fix: 'Add inline Promise.allSettled polyfill in entry',
     pkg: 'promise.allsettled',
     costKb: 0.4
   },
   'javascript.builtins.Promise.any': {
-    effort: 1,
     fix: 'Add Promise.any polyfill or core-js ponyfill',
     pkg: 'promise.any',
     costKb: 0.5
   },
   'javascript.builtins.String.replaceAll': {
-    effort: 1,
     fix: 'Add String.prototype.replaceAll polyfill in entry',
     pkg: 'string.prototype.replaceall',
     costKb: 0.3
   },
   'api.structuredClone': {
-    effort: 1,
     fix: 'Import @ungap/structured-clone (1.2KB) in entry',
     pkg: '@ungap/structured-clone',
     costKb: 1.2
   },
   'api.Crypto.randomUUID': {
-    effort: 1,
     fix: 'Use crypto.getRandomValues fallback or uuid v4',
     pkg: null,
     costKb: 0.2
   },
   'api.queueMicrotask': {
-    effort: 1,
     fix: 'Add queue-microtask or Promise.resolve polyfill',
     pkg: 'queue-microtask',
     costKb: 0.3
   },
   'javascript.builtins.Promise.withResolvers': {
-    effort: 1,
     fix: 'Add tiny inline Promise.withResolvers polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Object.groupBy': {
-    effort: 1,
     fix: 'Add tiny inline Object.groupBy polyfill in entry',
     pkg: null,
     costKb: 0.15
   },
   'javascript.builtins.Map.groupBy': {
-    effort: 1,
     fix: 'Add tiny inline Map.groupBy polyfill in entry',
     pkg: null,
     costKb: 0.15
   },
   'javascript.builtins.Array.fromAsync': {
-    effort: 1,
     fix: 'Add inline Array.fromAsync polyfill in entry',
     pkg: null,
     costKb: 0.3
   },
   'javascript.builtins.Set.union': {
-    effort: 1,
     fix: 'Add inline Set.prototype.union polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
   'javascript.builtins.Set.intersection': {
-    effort: 1,
     fix: 'Add inline Set.prototype.intersection polyfill in entry',
     pkg: null,
     costKb: 0.1
   },
 
-  // --- Effort 2 : Bundler Config & CSS Transforms ---
+  // --- Bundler Config & CSS Transforms ---
   'javascript.operators.optional_chaining': {
-    effort: 2,
     fix: 'Adjust bundler target (e.g. Vite target: "es2019")',
     pkg: null,
     costKb: 0
   },
   'javascript.operators.nullish_coalescing': {
-    effort: 2,
     fix: 'Adjust bundler target (e.g. Vite target: "es2019")',
     pkg: null,
     costKb: 0
   },
   'javascript.operators.logical_assignment': {
-    effort: 2,
     fix: 'Adjust bundler target to ES2020 in config',
     pkg: null,
     costKb: 0
   },
   'javascript.classes.private_class_fields': {
-    effort: 2,
     fix: 'Lower target in Vite/esbuild to "es2021"',
     pkg: null,
     costKb: 0.5
   },
   'css.selectors.nesting': {
-    effort: 2,
     fix: 'Enable postcss-nested in postcss.config.js',
     pkg: 'postcss-nested',
     costKb: 0
   },
   'css.types.color.color-mix': {
-    effort: 2,
     fix: 'Enable @csstools/postcss-color-mix in PostCSS',
     pkg: 'postcss-preset-env',
     costKb: 0
   },
   'css.types.color.oklch': {
-    effort: 2,
     fix: 'Add @csstools/postcss-oklab-function in PostCSS',
     pkg: '@csstools/postcss-oklab-function',
     costKb: 0
   },
   'css.types.color.light-dark': {
-    effort: 2,
     fix: 'Use @media (prefers-color-scheme) or CSS variables fallback for light-dark()',
     pkg: 'postcss-preset-env',
     costKb: 0
@@ -166,71 +118,60 @@ export const REMEDIATION_CATALOG = {
 
   // --- Safari & WebKit Visual Quirks ---
   'safari.css.backdrop-filter-prefix': {
-    effort: 1,
     fix: 'Add -webkit-backdrop-filter alongside backdrop-filter (Safari < 18 requirement)',
     pkg: null,
     costKb: 0
   },
   'safari.css.100vh-viewport': {
-    effort: 1,
     fix: 'Use graceful degradation: height: 100vh; @supports (height: 100dvh) { height: 100dvh; }',
     pkg: null,
     costKb: 0
   },
   'safari.css.aspect-ratio-flex': {
-    effort: 1,
     fix: 'Add min-width: 0 (or min-height: 0) to flex items with aspect-ratio to prevent WebKit blowout',
     pkg: null,
     costKb: 0
   },
   'safari.css.sticky-overflow-trap': {
-    effort: 2,
     fix: 'Avoid overflow: hidden/auto/scroll on ancestors of position: sticky elements in WebKit',
     pkg: null,
     costKb: 0
   },
   'safari.css.line-clamp-prefix': {
-    effort: 1,
     fix: 'Add display: -webkit-box; -webkit-line-clamp: N; -webkit-box-orient: vertical; alongside line-clamp',
     pkg: null,
     costKb: 0
   },
   'safari.css.appearance-none': {
-    effort: 1,
     fix: 'Add -webkit-appearance: none; appearance: none; to disable native iOS form styling',
     pkg: null,
     costKb: 0
   },
   'safari.css.text-size-adjust': {
-    effort: 1,
     fix: 'Add -webkit-text-size-adjust: 100%; text-size-adjust: 100%; to html/:root',
     pkg: null,
     costKb: 0
   },
 
-  // --- Effort 3 : Moderate Polyfills (5-20KB) ---
+  // --- Moderate Polyfills (5-20KB) ---
   'api.ResizeObserver': {
-    effort: 3,
     fix: 'Import resize-observer-polyfill (2.5KB gzip) dynamically if !window.ResizeObserver.',
     pkg: 'resize-observer-polyfill',
     costKb: 2.5
   },
   'api.IntersectionObserver': {
-    effort: 3,
     fix: 'Load intersection-observer polyfill (2.7KB gzip) if !window.IntersectionObserver.',
     pkg: 'intersection-observer',
     costKb: 2.7
   },
 
-  // --- Effort 4 : Structural Refactors ---
+  // --- Structural Architectural Adjustments ---
   'css.selectors.has': {
-    effort: 4,
     fix: 'Dynamic :has() cannot be polyfilled in CSS without heavy JS runtime selector engines. Use parent CSS class toggling in component state.',
     pkg: null,
     costKb: 0
   },
   'css.at-rules.container': {
-    effort: 4,
     fix: 'Container queries polyfill has high layout recalibration cost. Consider ResizeObserver with data attributes or standard media queries for critical paths.',
     pkg: null,
     costKb: 0
@@ -238,32 +179,8 @@ export const REMEDIATION_CATALOG = {
 };
 
 /**
- * Score an issue with effort level, remediation advice, and ROI
+ * Retrieve suggested optimization for a feature key
  */
-export function scoreIssue(featureKey, name, category, currentMatrix, baselineMatrix) {
-  const catalogEntry = REMEDIATION_CATALOG[featureKey] || null;
-
-  let effort = 2; // default moderate config/polyfill
-  let remediation = 'Check MDN documentation for compatible fallbacks.';
-  let costKb = 0;
-
-  if (catalogEntry) {
-    effort = catalogEntry.effort;
-    remediation = catalogEntry.fix;
-    costKb = catalogEntry.costKb || 0;
-  } else if (category === 'css' && featureKey.includes('has')) {
-    effort = 4;
-  } else if (category === 'api') {
-    effort = 3;
-  }
-
-  return {
-    featureKey,
-    name,
-    category,
-    effort,
-    effortMeta: EFFORT_LEVELS[effort],
-    remediation,
-    costKb
-  };
+export function getOptimizationForFeature(featureKey) {
+  return REMEDIATION_CATALOG[featureKey] || null;
 }

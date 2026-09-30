@@ -17,7 +17,7 @@ Static linters inspect source files before compilation, missing runtime realitie
 
 `compat-audit` parses the AST of compiled production bundles (`dist/`, `build/`, `.output/`) and evaluates features against MDN Browser Compatibility Data and Can I Use statistics across key Desktop and Mobile engines (Chrome, Safari, Firefox, Edge, iOS Safari, Chrome Android, Samsung Internet).
 
-It computes exact browser support floors, isolates guarded code, traces vendor package leaks via source maps, detects Safari and WebKit rendering traps, quantifies market coverage drift against declared targets, and outputs deterministic remediation plans.
+It computes exact browser support floors, isolates guarded code, traces vendor package leaks via source maps, detects Safari and WebKit rendering traps, quantifies market coverage drift against declared targets, and outputs severity-classified compatibility issues.
 
 ---
 
@@ -71,14 +71,14 @@ Supports project-level (`.agents/skills/`) and global (`~/.agents/skills/`) inst
 flowchart LR
     A["1. inspectProjectConfig()"] --> C["3. compareIntentVsReality()"]
     B["2. AST Scanners (JS / CSS)"] --> C
-    B --> D["4. scoreIssue()"]
+    B --> D["4. evaluateSeverity()"]
     C & D --> E["Terminal / Markdown Formatter"]
 ```
 
 1. **Configuration Inspection (`inspectProjectConfig`)**: Parses config files (`vite.config.*`, `tsconfig.json`, `postcss.config.*`, `.browserslistrc`) to extract declared intent (`target: 'es2020'` or PostCSS plugins).
 2. **AST Scanning (`JsScanner` & `CssScanner`)**: Parses compiled assets with Acorn and css-tree. Resolves scopes, detects unguarded Web APIs, inspects CSS selectors/properties, and correlates `.map` source maps with originating vendor packages.
 3. **Intent vs Reality Cross-Referencing (`compareIntentVsReality`)**: Evaluates declared compiler targets against actual bundle contents to identify configuration drift.
-4. **Effort Scoring (`scoreIssue`)**: Classifies issues into a 4-tier effort taxonomy with concrete remediation actions.
+4. **Severity Evaluation (`evaluateSeverity`)**: Classifies compatibility issues into a 4-tier CI/Sec severity scale (`BLOCKING`, `HIGH`, `MEDIUM`, `LOW`).
 
 ---
 
@@ -92,7 +92,7 @@ Running `compat-audit` at the root of a workspace automatically discovers config
 
 The generated report contains:
 1. **Monorepo Summary Table**: Overview of all sub-projects with declared targets, measured floors, audience coverage, and compliance verdicts.
-2. **Individual Project Reports**: Full diagnostics, browser headroom breakdown, and actionable remediation steps per project.
+2. **Individual Project Reports**: Full diagnostics, browser headroom breakdown, and severity-classified compatibility issues per project.
 
 To audit only a single package within the workspace:
 ```bash
@@ -101,16 +101,18 @@ npx compat-audit --project @scope/web
 
 ---
 
-## Effort Taxonomy (E1 to E4)
+## CI/Sec Severity Scale (BLOCKING, HIGH, MEDIUM, LOW)
 
-Detected issues are categorized into four effort tiers:
+Detected compatibility issues are categorized by execution impact:
 
-| Tier | Type | Examples | Typical Action |
+| Severity | Impact / Error Type | Examples | Browser Behavior |
 |---|---|---|---|
-| **E1** | Lightweight Runtime Polyfill | `structuredClone`, `crypto.randomUUID`, `Array.at`, `-webkit-` prefixes | Inline zero-dependency shim (< 300B) |
-| **E2** | Bundler / PostCSS Config | `postcss-nested`, Vite downleveling targets, color fallbacks | Update configuration in `vite.config` or `postcss.config` |
-| **E3** | Moderate Polyfill | `ResizeObserver`, `IntersectionObserver` | Add targeted polyfill package (5-20KB) |
-| **E4** | Architectural Refactor | `:has()`, `@container` | Progressive enhancement or layout fallback |
+| **BLOCKING** | SyntaxError / TypeError | Untranspiled syntax, `Array.prototype.at()` | Fatal script parse/runtime crash |
+| **HIGH** | ReferenceError | `structuredClone()`, `crypto.randomUUID()` | Crash when invoked |
+| **MEDIUM** | Ignored CSS (Layout) | `:has()`, `@container`, `light-dark()` | Silent layout/visual degradation |
+| **LOW** | Visual Glitch / Prefix | `-webkit-backdrop-filter`, `100vh` without `100dvh` | Minor cosmetic issue |
+
+Remediation and zero-bloat optimizations (zero-dependency runtime shims, bundler downleveling, CSS fallbacks) are handled interactively via the `/compat-optimize` agent skill.
 
 ---
 
@@ -126,6 +128,7 @@ compat-audit [dir] [options]
 |---|---|---|---|
 | `[dir]` | `string` | auto-detected | Target directory containing compiled assets (`dist`, `.output/public`, etc.). |
 | `--build` | `boolean` | `false` | Force a fresh production build before auditing. |
+| `--all` | `boolean` | `false` | Display all detected issues (default: only issues causing compatibility gaps). |
 | `--project, -p <name>` | `string` | - | Filter audit to a specific project in a monorepo workspace. |
 | `--region, -r <code>` | `string` | `global` | Audience region for market share coverage (e.g. `global`, `FR`, `US`). |
 | `--format <type>` | `string` | `terminal` | Output format: `terminal` (default), `json`, `markdown`. |

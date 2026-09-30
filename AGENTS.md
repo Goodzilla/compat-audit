@@ -75,12 +75,14 @@ The engine relies on 100% deterministic, offline static analysis (zero network r
    - Automatically detects root workspace configs (`pnpm-workspace.yaml`, `workspace.yml`, `package.json#workspaces`, `lerna.json`).
    - Audits all projects independently, outputs global summary table and full per-project diagnostics.
    - Supports targeting specific sub-projects via `--project <name>`.
-4. **Effort Taxonomy (E1 to E4)** (`src/scoring/effort.js`):
-   - **E1**: Lightweight runtime polyfills (< 1KB, e.g. `Array.at`, `crypto.randomUUID`, `Object.hasOwn`, `-webkit-` prefixes).
-   - **E2**: Bundler and PostCSS configuration changes (`postcss-nested`, Vite targets).
-   - **E3**: Moderate polyfills (5-20KB, e.g. `ResizeObserver`, `IntersectionObserver`).
-   - **E4**: Architectural refactoring (features lacking clean polyfills, e.g. `@container`, `:has()`).
-5. **AI Skills Scaffolder** (`src/commands/init.js`):
+4. **CI/Sec Severity Scale (BLOCKING, HIGH, MEDIUM, LOW)** (`src/scoring/severity.js`):
+   - **BLOCKING**: Fatal execution errors breaking application execution (`SyntaxError` on untranspiled syntax, `TypeError` on missing prototype method).
+   - **HIGH**: `ReferenceError` on missing global Web API (`structuredClone`, `crypto.randomUUID`, etc.).
+   - **MEDIUM**: Visual or layout degradation caused by ignored CSS rule, selector, or property (`:has()`, `@container`, `color: light-dark()`).
+   - **LOW**: Minor visual glitch or missing WebKit vendor prefix (`-webkit-backdrop-filter`, `100vh` without `100dvh`).
+5. **Optimization Playbook** (`src/optimization/playbook.js`):
+   - Technical catalog of zero-bloat remédiations and inline shims used by `/compat-optimize`.
+6. **AI Skills Scaffolder** (`src/commands/init.js`):
    - Scaffolds `/compat-audit` and `/compat-optimize` agent skills into `.agents/skills/` (project) or user home directories (global) with support for Claude Code, Antigravity, Cursor, and Codex.
 
 ---

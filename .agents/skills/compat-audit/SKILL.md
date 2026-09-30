@@ -10,7 +10,7 @@ allowed-tools:
 
 # Browser Compatibility Auditor (`compat-audit`)
 
-Audit compiled production assets against MDN and Can I Use data to detect browser compatibility floors, gaps against declared targets, and quick-win optimizations.
+Audit compiled production assets against MDN and Can I Use data to detect browser compatibility floors, gaps against declared targets, and severity-classified breaking impacts.
 
 ## Guardrails
 - **No exploratory shell commands**: Never run `ls`, `cat`, or `find`. Inspect configs (`package.json`, `tsconfig.json`, `vite.config.*`) using `view_file` / `ReadFile`.
@@ -24,9 +24,11 @@ Audit compiled production assets against MDN and Can I Use data to detect browse
    - **Executive Summary**: Verdict badge (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset counts, Target Coverage %, Measured Coverage %, and Audience Gap %.
    - **Browser Summary Table**: Columns: `Platform | Environment | Declared Target | Minimum Supported Version | Status & Headroom`. Cover Desktop (Chrome, Safari, Firefox, Edge) and Mobile (iOS Safari, Chrome Android, Samsung Internet).
    - **Diagnostics**: Detail source origin (`app` vs `vendor` packages via source maps), syntax vs runtime gaps, and WebKit visual quirks. Only render if issues exist.
-   - **Remediation Plan**: Group actionable items by effort tier:
-     - *Effort 1 (Micro-polyfills, ~5m)*: Inline zero-dependency runtime shims.
-     - *Effort 2 (Bundler/PostCSS, ~15m)*: Target adjustments or PostCSS plugins.
-     - *Effort 3 & 4 (Architectural)*: Heavier polyfills or layout constraints.
-4. **Next Step**: If Effort 1 or 2 quick wins exist, prompt:
-   > *"Run `/compat-optimize` to interactively apply these quick wins and verify improved browser coverage."*
+   - **Compatibility Issues & Breaking Impacts**: Table listing detected compatibility gaps classified by CI/Sec severity level (`BLOCKING`, `HIGH`, `MEDIUM`, `LOW`):
+     - Columns: `Severity | Feature | Impact / Error Type | Broken Browsers | Audience Loss`
+     - *Blocking*: SyntaxError (script parse failure) or TypeError (prototype method missing).
+     - *High*: ReferenceError (missing global Web API).
+     - *Medium*: Ignored CSS layout, selector or property.
+     - *Low*: Missing vendor prefix (-webkit-) or viewport styling quirk.
+4. **Next Step**: If compatibility issues exist, prompt:
+   > *"Run `/compat-optimize` to interactively resolve these compatibility issues and verify improved browser coverage."*

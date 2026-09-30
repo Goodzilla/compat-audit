@@ -75,26 +75,26 @@ export function formatMarkdownSingleReport(report, options = {}) {
     lines.push('');
   }
 
-  // 4. Actionable Remediation Plan
-  lines.push(`${h2Prefix} 4. Actionable Remediation Plan`);
-  if (report.quickWins.length === 0) {
-    lines.push('No immediate remediation required. Bundle meets or exceeds all declared targets.');
+  // 4. Compatibility Issues & Breaking Impacts
+  lines.push(`${h2Prefix} 4. Compatibility Issues & Breaking Impacts`);
+  const issues = report.issues || [];
+  if (issues.length === 0) {
+    lines.push('No compatibility issues found. Bundle meets or exceeds all declared targets.');
   } else {
-    lines.push('| Effort Level | Feature | Category | Recommended Action |');
-    lines.push('|---|---|---|---|');
-    for (const item of report.quickWins) {
-      lines.push(`| **E${item.effort}** (${item.effortMeta?.label || ''}) | \`${item.name}\` | ${item.category} | ${item.remediation} |`);
-    }
-  }
-  lines.push('');
-
-  if (report.structuralBlockers && report.structuralBlockers.length > 0) {
-    lines.push(`${h3Prefix} Architectural Constraints (Effort 3 & 4)`);
-    for (const item of report.structuralBlockers) {
-      lines.push(`- **${item.name}** (\`${item.featureKey}\`): ${item.remediation}`);
+    lines.push('| Severity | Feature | Impact / Error Type | Broken Browsers | Audience Loss |');
+    lines.push('|---|---|---|---|---|');
+    for (const item of issues) {
+      const brokenStr = (item.brokenBrowsers && item.brokenBrowsers.length > 0)
+        ? item.brokenBrowsers.join(', ')
+        : 'All modern';
+      const lossStr = item.audienceLossDisplay || (item.audienceLoss ? `${item.audienceLoss}%` : '0%');
+      lines.push(`| **${item.severity}** | \`${item.name}\` | ${item.impactType} | ${brokenStr} | ${lossStr} |`);
     }
     lines.push('');
+    lines.push('> [!TIP]');
+    lines.push('> Run `/compat-optimize` to interactively resolve these compatibility issues.');
   }
+  lines.push('');
 
   if (!options.isSubProject) {
     lines.push('---');

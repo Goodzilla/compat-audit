@@ -7,11 +7,11 @@ import { CssScanner } from './scanners/css.js';
 import { HtmlScanner } from './scanners/html.js';
 import { detectOutputDir, findAssetFiles } from './adapters/output-detector.js';
 import { inspectProjectConfig, resolveDeclaredTargets, compareIntentVsReality } from './adapters/bundlers.js';
-import { scoreIssue } from './scoring/effort.js';
+import { evaluateSeverity } from './scoring/severity.js';
 import { initSkills } from './commands/init.js';
 import { findWorkspace, inspectWorkspaceProject } from './adapters/workspace.js';
 
-export { CompatDatabase, TARGET_BROWSERS, initSkills, findWorkspace };
+export { CompatDatabase, TARGET_BROWSERS, initSkills, findWorkspace, evaluateSeverity };
 
 /**
  * Detect package manager based on lockfiles
@@ -61,6 +61,20 @@ export async function auditSingleProject(options = {}) {
 
   const findingsMap = new Map();
 
+  const addFindingToMap = (res) => {
+    if (!findingsMap.has(res.featureKey)) {
+      findingsMap.set(res.featureKey, {
+        ...res,
+        files: res.file ? [res.file] : []
+      });
+    } else {
+      const existing = findingsMap.get(res.featureKey);
+      if (res.file && !existing.files.includes(res.file)) {
+        existing.files.push(res.file);
+      }
+    }
+  };
+
   // Scan JS files
   for (const file of jsFiles) {
     try {
@@ -68,9 +82,7 @@ export async function auditSingleProject(options = {}) {
       const relPath = path.relative(rootDir, file);
       const results = jsScanner.scan(code, relPath, file);
       for (const res of results) {
-        if (!findingsMap.has(res.featureKey)) {
-          findingsMap.set(res.featureKey, res);
-        }
+        addFindingToMap(res);
       }
     } catch {}
   }
@@ -82,9 +94,7 @@ export async function auditSingleProject(options = {}) {
       const relPath = path.relative(rootDir, file);
       const results = cssScanner.scan(code, relPath);
       for (const res of results) {
-        if (!findingsMap.has(res.featureKey)) {
-          findingsMap.set(res.featureKey, res);
-        }
+        addFindingToMap(res);
       }
     } catch {}
   }
@@ -96,9 +106,7 @@ export async function auditSingleProject(options = {}) {
       const relPath = path.relative(rootDir, file);
       const results = htmlScanner.scan(code, relPath);
       for (const res of results) {
-        if (!findingsMap.has(res.featureKey)) {
-          findingsMap.set(res.featureKey, res);
-        }
+        addFindingToMap(res);
       }
     } catch {}
   }
@@ -132,25 +140,31 @@ export async function auditSingleProject(options = {}) {
   // Calculate estimated audience coverage % for the configured region
   const coverage = compatDb.calculateCoverage(browserFloor);
 
-  // Score all issues and tag whether they cause gaps on declared targets
-  const scoredIssues = allFindings.map(item => {
-    const scored = scoreIssue(item.featureKey, item.name, item.category, browserFloor, null);
+  // Score all issues with severity & impact breakdown
+  const allScoredIssues = allFindings.map(item => {
+    const scored = evaluateSeverity(item, declaredTargets, compatDb);
     const causesGap = TARGET_BROWSERS.some(b => {
       const declaredVer = declaredTargets.browsers[b.key]?.targetVersion;
       const featVer = item.support ? item.support[b.key] : null;
       return declaredVer !== null && declaredVer !== undefined && featVer !== null && featVer > declaredVer;
     });
-    return { ...scored, causesGap };
+    return {
+      ...scored,
+      causesGap
+    };
   });
 
-  // Group into Quick Wins (Effort 1 & 2) vs Structural Blockers (Effort 3 & 4)
-  const quickWins = scoredIssues
-    .filter(i => i.effort <= 2)
-    .sort((a, b) => (b.causesGap ? 1 : 0) - (a.causesGap ? 1 : 0) || a.effort - b.effort);
-
-  const structuralBlockers = scoredIssues
-    .filter(i => i.effort > 2)
-    .sort((a, b) => (b.causesGap ? 1 : 0) - (a.causesGap ? 1 : 0) || a.effort - b.effort);
+  // Filter issues: only gap-causing issues by default, or all if options.all
+  const issues = (options.all ? allScoredIssues : allScoredIssues.filter(i => i.causesGap))
+    .sort((a, b) => {
+      if (b.severityMeta.rank !== a.severityMeta.rank) {
+        return b.severityMeta.rank - a.severityMeta.rank;
+      }
+      if (b.audienceLoss !== a.audienceLoss) {
+        return b.audienceLoss - a.audienceLoss;
+      }
+      return a.name.localeCompare(b.name);
+    });
 
   const diagnostics = compareIntentVsReality(projectConfig, allFindings);
 
@@ -229,8 +243,8 @@ export async function auditSingleProject(options = {}) {
     targetCoverage,
     audienceGap,
     audienceLoss,
-    quickWins,
-    structuralBlockers,
+    issues,
+    allIssues: allScoredIssues,
     diagnostics,
     projectConfig,
     declaredTargets,
@@ -296,7 +310,8 @@ export async function auditBundle(options = {}) {
         build: false,
         projectName: proj.name,
         projectPath: proj.path,
-        region: options.region
+        region: options.region,
+        all: options.all
       });
       projectResults.push({
         name: proj.name,

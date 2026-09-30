@@ -156,7 +156,7 @@ packages:
     assert.ok(webProj, 'Web project should be audited');
 
     // App 2 has Array.at which causes a gap vs baseline ES2015
-    assert.equal(webProj.report.quickWins.some(w => w.featureKey === 'javascript.builtins.Array.at'), true);
+    assert.equal(webProj.report.issues.some(w => w.featureKey === 'javascript.builtins.Array.at'), true);
   });
 
   it('allows filtering by project in workspace', async () => {
@@ -182,7 +182,7 @@ packages:
     assert.ok(term.includes('PROJECT [1/2]:'));
     assert.ok(term.includes('PROJECT [2/2]:'));
     assert.ok(term.includes('BROWSER COMPATIBILITY SUMMARY'));
-    assert.ok(term.includes('ACTIONABLE REMEDIATIONS'));
+    assert.ok(term.includes('COMPATIBILITY ISSUES & BREAKING IMPACTS'));
   });
 
   it('formats markdown report with monorepo summary table and full sections per project', async () => {
