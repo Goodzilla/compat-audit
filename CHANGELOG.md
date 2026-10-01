@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/Goodzilla/compat-audit/compare/v1.14.0...v1.15.0) (2026-10-01)
+
+
+### Features
+
+* add runtime vm polyfill detection and interactive grill-me optimizer ([68d6ce0](https://github.com/Goodzilla/compat-audit/commit/68d6ce0aff2a0d4a056c82d50de4448d17b95e92))
+
 # [1.14.0](https://github.com/Goodzilla/compat-audit/compare/v1.13.0...v1.14.0) (2026-10-01)
 
 
