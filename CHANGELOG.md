@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/Goodzilla/compat-audit/compare/v1.13.0...v1.14.0) (2026-10-01)
+
+
+### Features
+
+* redesign compat-optimize with senior remediation tree and interactive prompts ([d1931a6](https://github.com/Goodzilla/compat-audit/commit/d1931a6f8516d6907c3d71e79513d135de79bd38))
+
 # [1.13.0](https://github.com/Goodzilla/compat-audit/compare/v1.12.0...v1.13.0) (2026-10-01)
 
 
