@@ -23,22 +23,36 @@ It computes exact browser support floors, isolates guarded code, traces vendor p
 
 ## Quickstart
 
-### 1. Direct CLI Audit
+### 1. Installation & Audit CLI
 
-Run directly against your project or monorepo workspace:
+Recommended installation:
+
+```bash
+pnpm add -D compat-audit
+# or
+npm install -D compat-audit
+```
+
+Local execution:
 
 ```bash
 # Auto-detects dist/ and scans production assets
-npx compat-audit
+pnpm compat-audit
 
 # Force a clean build before scanning to guarantee fresh assets
-npx compat-audit --build
+pnpm compat-audit --build
 
 # Specify audience region (default: global)
-npx compat-audit --region FR
+pnpm compat-audit --region FR
 
 # Audit a specific project within a monorepo workspace
-npx compat-audit --project apps/web
+pnpm compat-audit --project apps/web
+```
+
+For one-off execution without local installation, pin or specify the version explicitly:
+
+```bash
+npx compat-audit@latest
 ```
 
 ### 2. Scaffold AI Agent Skills
@@ -149,11 +163,18 @@ compat-audit [dir] [options]
 Prevent compatibility regressions in GitHub Actions:
 
 ```yaml
+- name: Install dependencies
+  run: pnpm install --frozen-lockfile # or npm ci
+
 - name: Audit Browser Compatibility
-  run: npx compat-audit --build --ci --markdown >> $GITHUB_STEP_SUMMARY
+  run: pnpm compat-audit --build --ci --markdown >> $GITHUB_STEP_SUMMARY
   # Or fail on any HIGH severity issues or higher:
-  # run: npx compat-audit --build --fail-on high --markdown >> $GITHUB_STEP_SUMMARY
+  # run: pnpm compat-audit --build --fail-on high --markdown >> $GITHUB_STEP_SUMMARY
 ```
+
+> **Supply Chain Security & Reproducibility**:
+> It is strongly recommended to add `compat-audit` as a `devDependency` in your project and run it via `pnpm compat-audit --ci` (or `npx compat-audit --ci`, which resolves the pinned local binary without network downloads).
+> Avoid unpinned `npx --yes` in CI pipelines: downloading packages on the fly bypasses package lockfile integrity verification (SHA-512 hashes), introducing supply chain security risks and non-reproducible CI runs.
 
 ---
 
