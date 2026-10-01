@@ -134,7 +134,10 @@ compat-audit [dir] [options]
 | `--format <type>` | `string` | `terminal` | Output format: `terminal` (default), `json`, `markdown`. |
 | `--json` | `boolean` | `false` | Shorthand for `--format json`. |
 | `--markdown`, `--md` | `boolean` | `false` | Shorthand for `--format markdown`. |
-| `--ci`, `--fail-on-gap` | `boolean` | `false` | Exit with code 1 if compatibility gaps are detected (CI mode). |
+| `--ci` | `boolean` | `false` | Exit with code 1 if `BLOCKING` issues are detected (default CI threshold: blocking). |
+| `--fail-on <level>` | `string` | - | Set CI failure severity threshold (`blocking`, `high`, `medium`, `low`). |
+| `--fail-on-gap` | `boolean` | `false` | Exit with code 1 on any compatibility gap (alias for `--fail-on low`). |
+| `--fail-on-incompatible` | `boolean` | `false` | Alias for `--fail-on-gap`. |
 | `init`, `--init-skills` | command | - | Scaffold AI agent skills interactively. |
 | `--local`, `-l` | `boolean` | `true` | Install skills to project workspace (`.agents/skills/`). |
 | `--global`, `-g` | `boolean` | `false` | Install skills globally to user home directories. |
@@ -148,6 +151,8 @@ Prevent compatibility regressions in GitHub Actions:
 ```yaml
 - name: Audit Browser Compatibility
   run: npx compat-audit --build --ci --markdown >> $GITHUB_STEP_SUMMARY
+  # Or fail on any HIGH severity issues or higher:
+  # run: npx compat-audit --build --fail-on high --markdown >> $GITHUB_STEP_SUMMARY
 ```
 
 ---

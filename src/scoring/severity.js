@@ -131,3 +131,52 @@ export function evaluateSeverity(finding, declaredTargets = null, compatDb = nul
     files: finding.files || (finding.file ? [finding.file] : [])
   };
 }
+
+/**
+ * Normalize and validate a threshold string into 'BLOCKING' | 'HIGH' | 'MEDIUM' | 'LOW'
+ */
+export function normalizeThreshold(threshold) {
+  if (!threshold) return null;
+  const upper = String(threshold).trim().toUpperCase();
+  if (SEVERITY_LEVELS[upper]) {
+    return upper;
+  }
+  throw new Error(`Invalid threshold "${threshold}". Allowed values: blocking, high, medium, low.`);
+}
+
+/**
+ * Check if a severity level meets or exceeds the required threshold
+ */
+export function meetsThreshold(severity, threshold) {
+  if (!threshold) return false;
+  const targetRank = SEVERITY_LEVELS[threshold]?.rank;
+  const currentRank = SEVERITY_LEVELS[severity]?.rank;
+  if (!targetRank || !currentRank) return false;
+  return currentRank >= targetRank;
+}
+
+/**
+ * Evaluate CI results based on a severity threshold and list of issues
+ */
+export function evaluateCiThreshold(issues, threshold) {
+  if (!threshold) {
+    return {
+      passed: true,
+      threshold: null,
+      failingIssuesCount: 0,
+      failingIssues: []
+    };
+  }
+
+  const normThreshold = normalizeThreshold(threshold);
+  // Only evaluate issues that cause compatibility gaps
+  const failingIssues = (issues || []).filter(issue => issue.causesGap && meetsThreshold(issue.severity, normThreshold));
+  const passed = failingIssues.length === 0;
+
+  return {
+    passed,
+    threshold: normThreshold,
+    failingIssuesCount: failingIssues.length,
+    failingIssues
+  };
+}

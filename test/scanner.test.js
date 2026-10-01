@@ -4,7 +4,12 @@ import { CompatDatabase } from '../src/data/compat-db.js';
 import { JsScanner } from '../src/scanners/js.js';
 import { CssScanner } from '../src/scanners/css.js';
 import { HtmlScanner } from '../src/scanners/html.js';
-import { evaluateSeverity } from '../src/scoring/severity.js';
+import {
+  evaluateSeverity,
+  normalizeThreshold,
+  meetsThreshold,
+  evaluateCiThreshold
+} from '../src/scoring/severity.js';
 
 describe('compat-audit core engine tests', () => {
   const db = new CompatDatabase();
@@ -169,5 +174,57 @@ describe('compat-audit core engine tests', () => {
     });
     assert.equal(quirkScore.severity, 'LOW');
     assert.equal(quirkScore.impactType, 'Visual Glitch (Prefix missing)');
+  });
+
+  it('evaluates CI threshold helpers and severity comparison logic', () => {
+    // 1. normalizeThreshold
+    assert.equal(normalizeThreshold('blocking'), 'BLOCKING');
+    assert.equal(normalizeThreshold('HIGH'), 'HIGH');
+    assert.equal(normalizeThreshold('Medium'), 'MEDIUM');
+    assert.equal(normalizeThreshold('low'), 'LOW');
+    assert.equal(normalizeThreshold(null), null);
+    assert.throws(() => normalizeThreshold('invalid'), /Invalid threshold/);
+
+    // 2. meetsThreshold
+    assert.equal(meetsThreshold('BLOCKING', 'BLOCKING'), true);
+    assert.equal(meetsThreshold('BLOCKING', 'HIGH'), true);
+    assert.equal(meetsThreshold('BLOCKING', 'LOW'), true);
+    assert.equal(meetsThreshold('HIGH', 'BLOCKING'), false);
+    assert.equal(meetsThreshold('HIGH', 'HIGH'), true);
+    assert.equal(meetsThreshold('MEDIUM', 'HIGH'), false);
+    assert.equal(meetsThreshold('LOW', 'MEDIUM'), false);
+    assert.equal(meetsThreshold('LOW', 'LOW'), true);
+
+    // 3. evaluateCiThreshold
+    const issues = [
+      { name: 'Array.at', severity: 'BLOCKING', causesGap: true },
+      { name: 'structuredClone', severity: 'HIGH', causesGap: true },
+      { name: ':has()', severity: 'MEDIUM', causesGap: false }, // Compliant feature, no gap
+      { name: '-webkit-prefix', severity: 'LOW', causesGap: true }
+    ];
+
+    // Threshold = BLOCKING: only Array.at fails
+    const resBlocking = evaluateCiThreshold(issues, 'BLOCKING');
+    assert.equal(resBlocking.passed, false);
+    assert.equal(resBlocking.failingIssuesCount, 1);
+    assert.equal(resBlocking.failingIssues[0].name, 'Array.at');
+
+    // Threshold = HIGH: Array.at and structuredClone fail
+    const resHigh = evaluateCiThreshold(issues, 'HIGH');
+    assert.equal(resHigh.passed, false);
+    assert.equal(resHigh.failingIssuesCount, 2);
+
+    // If only non-gap issues or lower severity exist:
+    const compliantIssues = [
+      { name: 'Promise.withResolvers', severity: 'BLOCKING', causesGap: false },
+      { name: '-webkit-prefix', severity: 'LOW', causesGap: true }
+    ];
+    const resCompliant = evaluateCiThreshold(compliantIssues, 'BLOCKING');
+    assert.equal(resCompliant.passed, true);
+    assert.equal(resCompliant.failingIssuesCount, 0);
+
+    // No threshold: always passes
+    const resNone = evaluateCiThreshold(issues, null);
+    assert.equal(resNone.passed, true);
   });
 });

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { auditBundle } from './index.js';
+import { auditBundle, normalizeThreshold } from './index.js';
 import { formatTerminalReport } from './formatters/terminal.js';
 import { formatJsonReport } from './formatters/json.js';
 import { formatMarkdownReport } from './formatters/markdown.js';
@@ -14,7 +14,8 @@ const pkg = JSON.parse(fs.readFileSync(path.resolve(__dirname, '../package.json'
 export async function runCli(argv = []) {
   let dir = null;
   let format = 'terminal';
-  let failOnIncompatible = false;
+  let failOn = null;
+  let ciMode = false;
   let build = false;
   let project = null;
   let region = 'global';
@@ -73,15 +74,34 @@ export async function runCli(argv = []) {
       project = argv[++i];
     } else if ((arg === '--region' || arg === '-r') && argv[i + 1]) {
       region = argv[++i];
-    } else if (arg === '--fail-on-incompatible' || arg === '--fail-on-gap' || arg === '--ci') {
-      failOnIncompatible = true;
+    } else if (arg === '--ci') {
+      ciMode = true;
+    } else if (arg === '--fail-on' && argv[i + 1] && !argv[i + 1].startsWith('-')) {
+      failOn = argv[++i];
+    } else if (arg === '--fail-on') {
+      console.error(pc.red('Error: --fail-on requires a threshold value (blocking, high, medium, low).'));
+      process.exit(1);
+    } else if (arg === '--fail-on-incompatible' || arg === '--fail-on-gap') {
+      failOn = 'LOW';
     } else if (!arg.startsWith('-') && !dir) {
       dir = arg;
     }
   }
 
+  let threshold = null;
+  if (failOn) {
+    try {
+      threshold = normalizeThreshold(failOn);
+    } catch (err) {
+      console.error(pc.red(`Error: ${err.message}`));
+      process.exit(1);
+    }
+  } else if (ciMode) {
+    threshold = 'BLOCKING';
+  }
+
   try {
-    const report = await auditBundle({ dir, build, project, region, all });
+    const report = await auditBundle({ dir, build, project, region, all, failOn: threshold });
 
     if (format === 'json') {
       console.log(formatJsonReport(report));
@@ -91,8 +111,24 @@ export async function runCli(argv = []) {
       console.log(formatTerminalReport(report));
     }
 
-    if (failOnIncompatible && report.hasGaps) {
-      process.exit(1);
+    if (threshold) {
+      const ci = report.ciResult;
+      if (!ci.passed) {
+        if (report.isMonorepo) {
+          console.error(pc.bold(pc.red(
+            `CI check failed: ${ci.failingIssuesCount} issue(s) matching threshold "${ci.threshold}" or above across ${ci.failingProjects.length} project(s) (${ci.failingProjects.join(', ')}).`
+          )));
+        } else {
+          console.error(pc.bold(pc.red(
+            `CI check failed: ${ci.failingIssuesCount} issue(s) matching threshold "${ci.threshold}" or above detected.`
+          )));
+        }
+        process.exit(1);
+      } else {
+        console.log(pc.bold(pc.green(
+          `CI check passed: 0 issues matching threshold "${ci.threshold}" or above detected.`
+        )));
+      }
     }
   } catch (err) {
     console.error(`\x1b[31mError:\x1b[0m ${err.message}`);
@@ -122,7 +158,9 @@ Options:
   --json                Shorthand for --format json
   --markdown, --md      Shorthand for --format markdown
   --all                 List all detected modern features, not just gap-causing issues
-  --ci, --fail-on-gap   Exit with code 1 if compatibility gaps or quick wins are detected (CI mode)
+  --ci                  Exit with code 1 if BLOCKING issues are detected (default threshold: blocking)
+  --fail-on <level>     Set CI failure threshold: blocking, high, medium, low
+  --fail-on-gap         Exit with code 1 on any compatibility gap (alias for --fail-on low)
   --fail-on-incompatible Alias for --fail-on-gap
   -h, --help            Display this help message
   -v, --version         Display version

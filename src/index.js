@@ -7,11 +7,20 @@ import { CssScanner } from './scanners/css.js';
 import { HtmlScanner } from './scanners/html.js';
 import { detectOutputDir, findAssetFiles } from './adapters/output-detector.js';
 import { inspectProjectConfig, resolveDeclaredTargets, compareIntentVsReality } from './adapters/bundlers.js';
-import { evaluateSeverity } from './scoring/severity.js';
+import { evaluateSeverity, normalizeThreshold, meetsThreshold, evaluateCiThreshold } from './scoring/severity.js';
 import { initSkills } from './commands/init.js';
 import { findWorkspace, inspectWorkspaceProject } from './adapters/workspace.js';
 
-export { CompatDatabase, TARGET_BROWSERS, initSkills, findWorkspace, evaluateSeverity };
+export {
+  CompatDatabase,
+  TARGET_BROWSERS,
+  initSkills,
+  findWorkspace,
+  evaluateSeverity,
+  normalizeThreshold,
+  meetsThreshold,
+  evaluateCiThreshold
+};
 
 /**
  * Detect package manager based on lockfiles
@@ -224,6 +233,9 @@ export async function auditSingleProject(options = {}) {
   const audienceLoss = Math.max(0, Math.round((targetCoverage - measuredCoverage) * 10) / 10);
   const regionLabel = compatDb.region === 'global' ? 'Global' : compatDb.region;
 
+  const threshold = options.failOn || options.threshold || (options.ci ? 'BLOCKING' : null);
+  const ciResult = evaluateCiThreshold(issues, threshold);
+
   return {
     projectName: options.projectName || null,
     projectPath: options.projectPath || null,
@@ -245,6 +257,7 @@ export async function auditSingleProject(options = {}) {
     audienceLoss,
     issues,
     allIssues: allScoredIssues,
+    ciResult,
     diagnostics,
     projectConfig,
     declaredTargets,
@@ -311,7 +324,10 @@ export async function auditBundle(options = {}) {
         projectName: proj.name,
         projectPath: proj.path,
         region: options.region,
-        all: options.all
+        all: options.all,
+        failOn: options.failOn,
+        threshold: options.threshold,
+        ci: options.ci
       });
       projectResults.push({
         name: proj.name,
@@ -331,6 +347,17 @@ export async function auditBundle(options = {}) {
     const region = firstProjectReport?.region || options.region || 'global';
     const regionLabel = firstProjectReport?.regionLabel || (region === 'global' ? 'Global' : region.toUpperCase());
 
+    const threshold = options.failOn || options.threshold || (options.ci ? 'BLOCKING' : null);
+    const normThreshold = normalizeThreshold(threshold);
+    const failingProjects = projectResults.filter(p => !p.report.ciResult?.passed);
+    const totalFailingIssues = projectResults.reduce((acc, p) => acc + (p.report.ciResult?.failingIssuesCount || 0), 0);
+    const ciResult = {
+      passed: failingProjects.length === 0,
+      threshold: normThreshold,
+      failingIssuesCount: totalFailingIssues,
+      failingProjects: failingProjects.map(p => p.name || p.path)
+    };
+
     return {
       isMonorepo: true,
       workspaceConfig: ws.configFile,
@@ -344,6 +371,7 @@ export async function auditBundle(options = {}) {
         verdict
       },
       hasGaps,
+      ciResult,
       projects: projectResults
     };
   }

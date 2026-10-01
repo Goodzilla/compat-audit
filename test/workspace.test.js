@@ -213,4 +213,56 @@ packages:
       console.log = originalLog;
     }
   });
+
+  it('evaluates and aggregates CI thresholds across monorepo projects', async () => {
+    // 1. Audit with BLOCKING threshold: App 2 has Array.at (causesGap === true)
+    const reportBlocking = await auditBundle({ cwd: tmpMonorepo, failOn: 'BLOCKING' });
+    assert.equal(reportBlocking.ciResult.passed, false);
+    assert.equal(reportBlocking.ciResult.threshold, 'BLOCKING');
+    assert.equal(reportBlocking.ciResult.failingProjects.includes('@scope/web'), true);
+    assert.ok(reportBlocking.ciResult.failingIssuesCount >= 1);
+
+    // 2. Audit with no threshold: always passed
+    const reportNoCi = await auditBundle({ cwd: tmpMonorepo });
+    assert.equal(reportNoCi.ciResult.passed, true);
+    assert.equal(reportNoCi.ciResult.threshold, null);
+  });
+
+  it('exits with code 1 when CI threshold is breached in runCli', async () => {
+    const originalLog = console.log;
+    const originalError = console.error;
+    const originalExit = process.exit;
+    let logged = '';
+    let errored = '';
+    let exitCode = null;
+
+    console.log = (msg) => { logged += msg + '\n'; };
+    console.error = (msg) => { errored += msg + '\n'; };
+    process.exit = (code) => { exitCode = code; throw new Error(`EXIT_${code}`); };
+
+    const prevCwd = process.cwd();
+    process.chdir(tmpMonorepo);
+    try {
+      // 1. Should fail with --fail-on blocking because App 2 has Array.at
+      await assert.rejects(
+        async () => { await runCli(['--fail-on', 'blocking']); },
+        { message: 'EXIT_1' }
+      );
+      assert.ok(errored.includes('CI check failed:'));
+      assert.ok(errored.includes('BLOCKING'));
+
+      // 2. Should pass with --fail-on when filtered to compliant project
+      errored = '';
+      logged = '';
+      exitCode = null;
+      await runCli(['--project', 'player', '--fail-on', 'blocking']);
+      assert.ok(logged.includes('CI check passed:'));
+      assert.equal(exitCode, null);
+    } finally {
+      process.chdir(prevCwd);
+      console.log = originalLog;
+      console.error = originalError;
+      process.exit = originalExit;
+    }
+  });
 });
