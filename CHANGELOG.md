@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/Goodzilla/compat-audit/compare/v1.12.0...v1.13.0) (2026-10-01)
+
+
+### Features
+
+* add configurable CI failure thresholds with --fail-on and report ciResult ([4cd8452](https://github.com/Goodzilla/compat-audit/commit/4cd84526f32c6b356e2c2b61d4a2f02360399ddc))
+
 # [1.12.0](https://github.com/Goodzilla/compat-audit/compare/v1.11.1...v1.12.0) (2026-09-30)
 
 
