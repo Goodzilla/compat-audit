@@ -11,7 +11,7 @@ export class JsScanner {
     this.compatDb = compatDb;
   }
 
-  scan(code, filename = 'chunk.js', fullFilePath = null) {
+  scan(code, filename = 'chunk.js', fullFilePath = null, bundlePolyfills = null) {
     const compatDb = this.compatDb;
     const findings = new Map();
 
@@ -105,7 +105,7 @@ export class JsScanner {
     }
 
     // --- Lexical Scope & Polyfill / Guard Tracking ---
-    const polyfilledFeatures = new Set();
+    const polyfilledFeatures = new Set(bundlePolyfills || []);
 
     function extractBindings(pattern, set) {
       if (!pattern) return;
@@ -191,22 +191,84 @@ export class JsScanner {
       return names;
     }
 
+    const getPropName = (propNode) => {
+      if (!propNode) return null;
+      if (propNode.type === 'Identifier') return propNode.name;
+      if (propNode.type === 'Literal' && typeof propNode.value === 'string') return propNode.value;
+      return null;
+    };
+
+    const registerPolyfill = (propName, targetType = null) => {
+      if (!propName) return;
+      polyfilledFeatures.add(propName);
+      polyfilledFeatures.add('prototype.' + propName);
+
+      const protoEntry = compatDb.lookupPrototype(propName);
+      if (protoEntry) {
+        polyfilledFeatures.add(protoEntry.featureKey);
+      }
+      if (targetType) {
+        polyfilledFeatures.add(`${targetType}.${propName}`);
+        polyfilledFeatures.add(`${targetType}.prototype.${propName}`);
+        polyfilledFeatures.add(`javascript.builtins.${targetType}.${propName}`);
+      }
+      polyfilledFeatures.add('api.' + propName);
+    };
+
     // Pass 1: Walk to detect polyfill definitions
     walk.simple(ast, {
       AssignmentExpression(node) {
-        // window.X = ... or globalThis.X = ...
         if (node.left.type === 'MemberExpression') {
           const obj = node.left.object;
           const prop = node.left.property;
-          const propName = prop?.name;
-          if (obj.type === 'Identifier' && ['window', 'globalThis', 'self'].includes(obj.name) && propName) {
-            polyfilledFeatures.add(propName);
-            polyfilledFeatures.add('api.' + propName);
-          } else if (obj.type === 'Identifier' && obj.name === 'Object' && propName) {
-            polyfilledFeatures.add('javascript.builtins.Object.' + propName);
-          } else if (obj.type === 'MemberExpression' && obj.property?.name === 'prototype' && propName) {
-            polyfilledFeatures.add('prototype.' + propName);
-            polyfilledFeatures.add(propName);
+          const propName = getPropName(prop);
+          if (!propName) return;
+
+          if (obj.type === 'Identifier' && ['window', 'globalThis', 'self'].includes(obj.name)) {
+            registerPolyfill(propName, null);
+          } else if (obj.type === 'Identifier' && ['Object', 'Array', 'Uint8Array', 'String', 'Promise', 'Math', 'Reflect'].includes(obj.name)) {
+            if (propName !== 'prototype') {
+              registerPolyfill(propName, obj.name);
+            }
+          } else if (obj.type === 'MemberExpression' && obj.property?.name === 'prototype') {
+            const targetType = obj.object?.type === 'Identifier' ? obj.object.name : null;
+            registerPolyfill(propName, targetType);
+          }
+        }
+      },
+      CallExpression(node) {
+        const callee = node.callee;
+        if (callee.type === 'MemberExpression') {
+          const objName = callee.object?.name;
+          const methodName = callee.property?.name;
+
+          if ((objName === 'Object' || objName === 'Reflect') && methodName === 'defineProperty') {
+            const targetArg = node.arguments[0];
+            const propArg = node.arguments[1];
+            const propName = getPropName(propArg);
+
+            if (propName && targetArg) {
+              if (targetArg.type === 'MemberExpression' && targetArg.property?.name === 'prototype') {
+                const targetType = targetArg.object?.name;
+                registerPolyfill(propName, targetType);
+              } else if (targetArg.type === 'Identifier') {
+                registerPolyfill(propName, targetArg.name);
+              }
+            }
+          }
+
+          if (objName === 'Object' && methodName === 'assign') {
+            const targetArg = node.arguments[0];
+            const sourceArg = node.arguments[1];
+            if (targetArg?.type === 'MemberExpression' && targetArg.property?.name === 'prototype' && sourceArg?.type === 'ObjectExpression') {
+              const targetType = targetArg.object?.name;
+              for (const p of sourceArg.properties) {
+                if (p.type === 'Property') {
+                  const name = getPropName(p.key);
+                  if (name) registerPolyfill(name, targetType);
+                }
+              }
+            }
           }
         }
       }
@@ -379,7 +441,7 @@ export class JsScanner {
         const isCrypto = (node.object?.name === 'crypto') ||
           (node.object?.type === 'MemberExpression' && node.object.property?.name === 'crypto');
         if (isCrypto && propName === 'randomUUID') {
-          if (!isGuarded(scope, 'randomUUID') && !polyfilledFeatures.has('randomUUID')) {
+          if (!isGuarded(scope, 'randomUUID') && !polyfilledFeatures.has('randomUUID') && !polyfilledFeatures.has('api.Crypto.randomUUID')) {
             addFinding('api.Crypto.randomUUID', 'crypto.randomUUID()', 'api');
           }
           return;
@@ -391,7 +453,10 @@ export class JsScanner {
           const staticEntry = compatDb.lookupStatic(objName, propName);
           if (staticEntry) {
             const qualifiedName = `${objName}.${propName}`;
-            if (!isGuarded(scope, propName) && !isGuarded(scope, qualifiedName) && !polyfilledFeatures.has(staticEntry.featureKey)) {
+            if (!isGuarded(scope, propName) && !isGuarded(scope, qualifiedName) &&
+                !polyfilledFeatures.has(staticEntry.featureKey) &&
+                !polyfilledFeatures.has(qualifiedName) &&
+                !polyfilledFeatures.has(propName)) {
               addFinding(staticEntry.featureKey, staticEntry.name, 'builtin', staticEntry.compat, staticEntry.support);
             }
             return;
@@ -424,6 +489,7 @@ export class JsScanner {
 
         const globalEntry = compatDb.lookupGlobal(name);
         if (globalEntry) {
+          if (polyfilledFeatures.has(globalEntry.featureKey)) return;
           addFinding(globalEntry.featureKey, globalEntry.name, 'api', globalEntry.compat, globalEntry.support);
         }
       }

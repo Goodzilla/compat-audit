@@ -45,6 +45,17 @@ export function formatMarkdownSingleReport(report, options = {}) {
   lines.push('');
   lines.push(`- **Scanned Directory:** \`${report.targetDir}\``);
   lines.push(`- **Total Files Scanned:** ${report.totalFiles} (${report.totalJsFiles} JS, ${report.totalCssFiles} CSS, ${report.totalHtmlFiles} HTML)`);
+  if (report.detectedPolyfills && report.detectedPolyfills.length > 0) {
+    const hasRuntime = report.detectedPolyfills.some(p => p.runtimeVerified);
+    const badge = hasRuntime ? ' *(Runtime Verified)*' : '';
+    const polyNames = report.detectedPolyfills.map(p => {
+      const chunk = p.originChunk ? ` (\`${p.originChunk.split('/').pop()}\`)` : '';
+      return `\`${p.name || p.featureKey}\`${chunk}`;
+    }).slice(0, 5).join(', ');
+    const count = report.detectedPolyfills.length;
+    const more = count > 5 ? ` +${count - 5} more` : '';
+    lines.push(`- **Detected Polyfills${badge}:** ${count} active (${polyNames}${more})`);
+  }
   lines.push(`- **Target Coverage (${regionLabel}):** **${targetCov}%**${targetLabel ? ` (${targetLabel})` : ''}`);
   lines.push(`- **Measured Coverage (${regionLabel}):** **${measuredCov}%**`);
   lines.push(`- **Audience Gap:** ${gapText}`);

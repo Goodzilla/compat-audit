@@ -21,7 +21,7 @@ Audit compiled production assets against MDN and Can I Use data to detect browse
 1. **Inspect Intent**: Read declared targets from `package.json`, `tsconfig.json`, `vite.config.*`, or `.browserslistrc`.
 2. **Run Audit**: Execute `npx compat-audit --build --json` and parse the output JSON into memory.
 3. **Report Results**: Present a clean 4-section report using standard English engineering terms:
-   - **Executive Summary**: Verdict badge (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset counts, Target Coverage %, Measured Coverage %, and Audience Gap %.
+   - **Executive Summary**: Verdict badge (`COMPLIANT` or `COMPATIBILITY GAP DETECTED`), asset counts, detected active polyfills (`Detected Polyfills: X active`), Target Coverage %, Measured Coverage %, and Audience Gap %.
    - **Browser Summary Table**: Columns: `Platform | Environment | Declared Target | Minimum Supported Version | Status & Headroom`. Cover Desktop (Chrome, Safari, Firefox, Edge) and Mobile (iOS Safari, Chrome Android, Samsung Internet).
    - **Diagnostics**: Detail source origin (`app` vs `vendor` packages via source maps), syntax vs runtime gaps, and WebKit visual quirks. Only render if issues exist.
    - **Compatibility Issues & Breaking Impacts**: Table listing detected compatibility gaps classified by CI/Sec severity level (`BLOCKING`, `HIGH`, `MEDIUM`, `LOW`):
@@ -31,4 +31,4 @@ Audit compiled production assets against MDN and Can I Use data to detect browse
      - *Medium*: Ignored CSS layout, selector or property.
      - *Low*: Missing vendor prefix (-webkit-) or viewport styling quirk.
 4. **Next Step**: If compatibility issues exist, prompt:
-   > *"Run `/compat-optimize` to interactively resolve these compatibility issues and verify improved browser coverage."*
+   > *"Run `/compat-optimize` to start an interactive grill-me decision interview and arbitrate remediation strategies step-by-step."*

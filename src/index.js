@@ -1,6 +1,5 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { execSync } from 'node:child_process';
 import { CompatDatabase, TARGET_BROWSERS, getBaselineSupport } from './data/compat-db.js';
 import { JsScanner } from './scanners/js.js';
 import { CssScanner } from './scanners/css.js';
@@ -10,6 +9,7 @@ import { inspectProjectConfig, resolveDeclaredTargets, compareIntentVsReality } 
 import { evaluateSeverity, normalizeThreshold, meetsThreshold, evaluateCiThreshold } from './scoring/severity.js';
 import { initSkills } from './commands/init.js';
 import { findWorkspace, inspectWorkspaceProject } from './adapters/workspace.js';
+import { detectRuntimePolyfillsInVm } from './adapters/polyfills.js';
 
 export {
   CompatDatabase,
@@ -84,12 +84,39 @@ export async function auditSingleProject(options = {}) {
     }
   };
 
-  // Scan JS files
+  // --- Polyfill Detection via node:vm Runtime Sandbox ---
+  const activePolyfills = new Map();
+
   for (const file of jsFiles) {
     try {
       const code = fs.readFileSync(file, 'utf-8');
       const relPath = path.relative(rootDir, file);
-      const results = jsScanner.scan(code, relPath, file);
+      const runtimeExtracted = detectRuntimePolyfillsInVm(code, relPath, compatDb);
+      for (const [key, val] of runtimeExtracted) {
+        activePolyfills.set(key, val);
+      }
+    } catch {}
+  }
+
+  // Build lookup Set of all polyfill identifiers and feature keys
+  const bundlePolyfillKeys = new Set();
+  for (const [key, val] of activePolyfills) {
+    bundlePolyfillKeys.add(key);
+    if (val.name) bundlePolyfillKeys.add(val.name);
+    const shortName = key.split('.').pop();
+    if (shortName) {
+      bundlePolyfillKeys.add(shortName);
+      bundlePolyfillKeys.add('prototype.' + shortName);
+      bundlePolyfillKeys.add('api.' + shortName);
+    }
+  }
+
+  // Scan JS files with active bundle-wide polyfills
+  for (const file of jsFiles) {
+    try {
+      const code = fs.readFileSync(file, 'utf-8');
+      const relPath = path.relative(rootDir, file);
+      const results = jsScanner.scan(code, relPath, file, bundlePolyfillKeys);
       for (const res of results) {
         addFindingToMap(res);
       }
@@ -235,6 +262,7 @@ export async function auditSingleProject(options = {}) {
 
   const threshold = options.failOn || options.threshold || (options.ci ? 'BLOCKING' : null);
   const ciResult = evaluateCiThreshold(issues, threshold);
+  const detectedPolyfills = Array.from(activePolyfills.values());
 
   return {
     projectName: options.projectName || null,
@@ -257,6 +285,7 @@ export async function auditSingleProject(options = {}) {
     audienceLoss,
     issues,
     allIssues: allScoredIssues,
+    detectedPolyfills,
     ciResult,
     diagnostics,
     projectConfig,

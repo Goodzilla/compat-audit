@@ -41,6 +41,17 @@ export function formatTerminalSingleReport(report, options = {}) {
   lines.push(`${pc.bold('Status:'.padEnd(28))} ${verdictBadge}`);
   lines.push(`${pc.bold('Scanned Directory:'.padEnd(28))} ${pc.green(report.targetDir)}`);
   lines.push(`${pc.bold('Assets Scanned:'.padEnd(28))} ${pc.yellow(report.totalFiles)} files (${report.totalJsFiles} JS, ${report.totalCssFiles} CSS, ${report.totalHtmlFiles} HTML)`);
+  if (report.detectedPolyfills && report.detectedPolyfills.length > 0) {
+    const hasRuntime = report.detectedPolyfills.some(p => p.runtimeVerified);
+    const label = hasRuntime ? 'Detected Polyfills (Runtime):' : 'Detected Polyfills:';
+    const names = report.detectedPolyfills.map(p => {
+      const chunk = p.originChunk ? pc.dim(` [${p.originChunk.split('/').pop()}]`) : '';
+      return (p.name || p.featureKey) + chunk;
+    }).slice(0, 5).join(', ');
+    const count = report.detectedPolyfills.length;
+    const more = count > 5 ? ` +${count - 5} more` : '';
+    lines.push(`${pc.bold(label.padEnd(28))} ${pc.cyan(`${count} active (${names}${more})`)}`);
+  }
   lines.push(`${pc.bold(`Target Coverage (${regionLabel}):`.padEnd(28))} ${pc.bold(pc.cyan(targetCov + '%'))}${targetLabel ? ` (${targetLabel})` : ''}`);
   lines.push(`${pc.bold(`Measured Coverage (${regionLabel}):`.padEnd(28))} ${pc.bold(pc.green(measuredCov + '%'))}`);
   lines.push(`${pc.bold('Audience Gap:'.padEnd(28))} ${gapDisplay}`);
